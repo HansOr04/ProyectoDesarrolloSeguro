@@ -1,0 +1,291 @@
+/* src/styles/pages/Charts.css */
+
+/* Shared styles for chart-heavy pages: Predictions, Comparisons */
+
+/* ========== CHART PAGE ========== */
+.chart-page {
+  padding: calc(var(--navbar-height) + var(--spacing-xl)) var(--spacing-xl) var(--spacing-xl);
+  min-height: 100vh;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+.chart-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.chart-page__title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* ========== CHART CONTROLS ========== */
+.chart-controls {
+  background: var(--color-surface);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  align-items: flex-end;
+}
+
+.chart-controls__group {
+  flex: 1;
+  min-width: 140px;
+}
+
+.chart-controls__label {
+  display: block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xs);
+}
+
+/* ========== CHART CONTAINER ========== */
+.chart-container {
+  background: var(--color-surface);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+}
+
+.chart-container__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chart-container__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.chart-container__subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: var(--spacing-xs) 0 0 0;
+}
+
+.chart-wrapper {
+  width: 100%;
+  height: 350px;
+  min-height: 300px;
+}
+
+/* ========== STATS ROW ========== */
+.chart-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.chart-stat {
+  background: rgba(179, 183, 146, 0.1);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.chart-stat__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.chart-stat__value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.chart-stat__value--income {
+  color: var(--color-success);
+}
+
+.chart-stat__value--expense {
+  color: var(--color-error);
+}
+
+.chart-stat__value--balance {
+  color: var(--color-matcha);
+}
+
+/* ========== INFO PANELS ========== */
+.chart-info-panel {
+  background: rgba(229, 224, 216, 0.5);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  border-left: 4px solid var(--color-chai);
+}
+
+.chart-info-panel__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.chart-info-panel__content {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* ========== COMPARISON CARDS ========== */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.comparison-card {
+  background: var(--color-surface);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-xl);
+  position: relative;
+  overflow: hidden;
+}
+
+.comparison-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-pistachio) 0%, var(--color-matcha) 100%);
+}
+
+.comparison-card__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.comparison-card__row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.comparison-card__row:last-child {
+  border-bottom: none;
+}
+
+.comparison-card__label {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.comparison-card__value {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+  .chart-wrapper {
+    height: 300px;
+    min-height: 250px;
+  }
+}
+
+@media (max-width: 768px) {
+  .chart-page {
+    padding: calc(var(--navbar-height) + var(--spacing-md)) var(--spacing-md) var(--spacing-md);
+  }
+  
+  .chart-page__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .chart-page__title {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .chart-controls {
+    flex-direction: column;
+    padding: var(--spacing-md);
+  }
+  
+  .chart-controls__group {
+    width: 100%;
+  }
+  
+  .chart-container {
+    padding: var(--spacing-md);
+  }
+  
+  .chart-container__header {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    align-items: flex-start;
+  }
+  
+  .chart-wrapper {
+    height: 250px;
+    min-height: 200px;
+  }
+  
+  .chart-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+  
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .chart-page {
+    padding: calc(var(--navbar-height) + var(--spacing-sm)) var(--spacing-sm) var(--spacing-sm);
+  }
+  
+  .chart-page__title {
+    font-size: var(--font-size-xl);
+  }
+  
+  .chart-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-stat {
+    padding: var(--spacing-sm);
+  }
+  
+  .chart-stat__value {
+    font-size: var(--font-size-lg);
+  }
+}

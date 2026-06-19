@@ -1,0 +1,168 @@
+{
+  "realm": "universidad",
+  "displayName": "Universidad - Triage & Monetix",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      { "name": "doctor",        "description": "Médico del sistema Triage" },
+      { "name": "patient",       "description": "Paciente del sistema Triage" },
+      { "name": "admin",         "description": "Administrador (ambos sistemas)" },
+      { "name": "monetix-user",  "description": "Usuario del sistema Monetix" },
+      { "name": "monetix-admin", "description": "Administrador del sistema Monetix" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "triage-client",
+      "name": "Triage Backend (auth-service)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "triage-client-secret-change-me",
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
+    },
+    {
+      "clientId": "triage-frontend",
+      "name": "Triage Frontend (SPA)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "pkceCodeChallengeMethod": "S256",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3001/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:3001"
+      ],
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
+    },
+    {
+      "clientId": "monetix-client",
+      "name": "Monetix Backend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "monetix-client-secret-change-me",
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
+    },
+    {
+      "clientId": "monetix-frontend",
+      "name": "Monetix Frontend (SPA)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "pkceCodeChallengeMethod": "S256",
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:5174/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:5174"
+      ],
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "roles",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false" },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin-triage",
+      "email": "admin@triage.universidad.edu",
+      "firstName": "Admin",
+      "lastName": "Triage",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": false }],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "doctor-triage",
+      "email": "doctor@triage.universidad.edu",
+      "firstName": "Doctor",
+      "lastName": "Demo",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Doctor1234!", "temporary": false }],
+      "realmRoles": ["doctor"]
+    },
+    {
+      "username": "paciente-triage",
+      "email": "paciente@triage.universidad.edu",
+      "firstName": "Paciente",
+      "lastName": "Demo",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Paciente1234!", "temporary": false }],
+      "realmRoles": ["patient"]
+    },
+    {
+      "username": "admin-monetix",
+      "email": "admin@monetix.universidad.edu",
+      "firstName": "Admin",
+      "lastName": "Monetix",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": false }],
+      "realmRoles": ["monetix-admin"]
+    },
+    {
+      "username": "user-monetix",
+      "email": "user@monetix.universidad.edu",
+      "firstName": "Usuario",
+      "lastName": "Demo",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "User1234!", "temporary": false }],
+      "realmRoles": ["monetix-user"]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+# ============ Node ============
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# ============ Build outputs ============
+dist/
+build/
+.next/
+out/
+
+# ============ Environment secrets ============
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Mantener .env.example en el repo
+!.env.example
+!**/.env.example
+
+# ============ Logs ============
+logs/
+*.log
+
+# ============ Docker volumes (no commitear datos) ============
+data/
+
+# ============ OS ============
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============ IDEs ============
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ============ TypeScript ============
+*.tsbuildinfo
+
+# ============ Test coverage ============
+coverage/
+.nyc_output/
+
+# ============ Keycloak (datos de runtime, no configuración) ============
+AplicacionesDistribuidas/keycloak/data/

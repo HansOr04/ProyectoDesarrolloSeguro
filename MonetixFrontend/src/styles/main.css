@@ -1,0 +1,30 @@
+/* src/styles/main.css */
+
+/* ========== IMPORTACIONES EN ORDEN ========== */
+
+/* 1. Variables y Reset */
+@import './variables.css';
+@import './reset.css';
+
+/* 2. Utilidades */
+@import './utils/utilities.css';
+@import './utils/responsive.css';
+
+/* 3. Componentes */
+@import './components/Header.css';
+@import './components/Button.css';
+@import './components/Form.css';
+@import './components/Card.css';
+@import './components/Table.css';
+@import './components/Modal.css';
+@import './components/Loader.css';
+
+/* 4. Páginas */
+@import './pages/Auth.css';
+@import './pages/Users.css';
+@import './pages/Alerts.css';
+@import './pages/Home.css';
+@import './pages/Transactions.css';
+@import './pages/Categories.css';
+@import './pages/Goals.css';
+@import './pages/Charts.css';

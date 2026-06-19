@@ -1,0 +1,178 @@
+/* src/styles/utils/responsive.css */
+
+/* ========== BREAKPOINTS ========== */
+/*
+  Mobile: < 640px
+  Tablet: 640px - 1023px
+  Desktop: >= 1024px
+*/
+
+/* ========== VISIBILITY UTILITIES ========== */
+
+/* Hide on mobile (< 640px) */
+@media (max-width: 639px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Show only on mobile */
+.show-mobile {
+  display: none !important;
+}
+@media (max-width: 639px) {
+  .show-mobile {
+    display: block !important;
+  }
+  .show-mobile-flex {
+    display: flex !important;
+  }
+}
+
+/* Hide on tablet and below (< 1024px) */
+@media (max-width: 1023px) {
+  .hide-tablet {
+    display: none !important;
+  }
+}
+
+/* ========== CONTAINER UTILITIES ========== */
+.container-responsive {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-xl);
+}
+
+@media (max-width: 768px) {
+  .container-responsive {
+    padding: 0 var(--spacing-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .container-responsive {
+    padding: 0 var(--spacing-sm);
+  }
+}
+
+/* ========== FLEX UTILITIES ========== */
+.flex-responsive {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+  .flex-responsive {
+    flex-direction: column;
+  }
+}
+
+.flex-wrap-responsive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+/* ========== GRID UTILITIES ========== */
+.grid-responsive {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.grid-responsive--2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-responsive--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-responsive--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1023px) {
+  .grid-responsive--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-responsive--2,
+  .grid-responsive--3,
+  .grid-responsive--4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========== TEXT UTILITIES ========== */
+@media (max-width: 640px) {
+  .text-responsive-sm {
+    font-size: var(--font-size-sm);
+  }
+  
+  .title-responsive {
+    font-size: var(--font-size-xl);
+  }
+}
+
+/* ========== SPACING UTILITIES ========== */
+@media (max-width: 640px) {
+  .p-responsive {
+    padding: var(--spacing-md) !important;
+  }
+  
+  .gap-responsive {
+    gap: var(--spacing-sm) !important;
+  }
+}
+
+/* ========== ANIMATIONS ========== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn var(--transition-normal) ease-out;
+}

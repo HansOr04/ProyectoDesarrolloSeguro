@@ -1,0 +1,113 @@
+/* src/styles/components/Button.css */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--border-radius-md);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Variantes de color */
+.btn-primary {
+  background-color: var(--color-matcha);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #6D8C61;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background-color: var(--color-chai);
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #C39770;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--color-matcha);
+  border: 2px solid var(--color-matcha);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--color-matcha);
+  color: white;
+}
+
+.btn-danger {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #C56C6C;
+  box-shadow: var(--shadow-md);
+}
+
+/* Tamaños */
+.btn-sm {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.btn-lg {
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  font-size: var(--font-size-lg);
+}
+
+/* Ancho completo */
+.btn-block {
+  width: 100%;
+}
+
+/* Enhanced hover effects */
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+  .btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-sm);
+  }
+  
+  .btn-lg {
+    padding: var(--spacing-md) var(--spacing-xl);
+    font-size: var(--font-size-base);
+  }
+}
+
+@media (max-width: 480px) {
+  .btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: 44px; /* Touch-friendly minimum */
+  }
+  
+  .btn-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    min-height: 36px;
+  }
+}

@@ -1,0 +1,99 @@
+/* src/styles/components/Form.css */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.form-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input {
+  padding: var(--spacing-md);
+  background-color: var(--color-almond);
+  border: 2px solid transparent;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-base);
+  transition: all var(--transition-normal);
+  outline: none;
+}
+
+.form-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.form-input:focus {
+  background-color: var(--color-surface);
+  border-color: var(--color-matcha);
+  box-shadow: 0 0 0 3px rgba(128, 150, 113, 0.1);
+}
+
+.form-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-input.error {
+  border-color: var(--color-error);
+}
+
+.form-input.error:focus {
+  box-shadow: 0 0 0 3px rgba(216, 124, 124, 0.1);
+}
+
+.form-error {
+  font-size: var(--font-size-sm);
+  color: var(--color-error);
+  margin-top: var(--spacing-xs);
+}
+
+.form-select {
+  padding: var(--spacing-md);
+  background-color: var(--color-almond);
+  border: 2px solid transparent;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-base);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+  outline: none;
+}
+
+.form-select:focus {
+  background-color: var(--color-surface);
+  border-color: var(--color-matcha);
+  box-shadow: 0 0 0 3px rgba(128, 150, 113, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.form-actions.center {
+  justify-content: center;
+}
+
+.form-link {
+  color: var(--color-matcha);
+  text-decoration: underline;
+  font-size: var(--font-size-sm);
+  transition: color var(--transition-fast);
+}
+
+.form-link:hover {
+  color: var(--color-chai);
+}

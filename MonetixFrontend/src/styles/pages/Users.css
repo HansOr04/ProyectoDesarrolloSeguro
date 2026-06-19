@@ -1,0 +1,124 @@
+/* src/styles/pages/Users.css */
+
+.users-page {
+  padding: calc(var(--navbar-height) + var(--spacing-xl)) var(--spacing-xl) var(--spacing-xl);
+  min-height: 100vh;
+}
+
+.users-page__header {
+  margin-bottom: var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.users-page__title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.users-page__filters {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background-color: var(--color-surface);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.users-page__filter-group {
+  flex: 1;
+}
+
+.users-table-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.icon-btn-edit {
+  background-color: var(--color-chai);
+  color: white;
+}
+
+.icon-btn-edit:hover {
+  background-color: #C39770;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.icon-btn-delete {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.icon-btn-delete:hover {
+  background-color: #C56C6C;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+}
+
+.pagination-info {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+  .users-page {
+    padding: calc(var(--navbar-height) + var(--spacing-md)) var(--spacing-md) var(--spacing-md);
+  }
+  
+  .users-page__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+  
+  .users-page__title {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .users-page__filters {
+    flex-direction: column;
+  }
+  
+  .pagination {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .users-page {
+    padding: calc(var(--navbar-height) + var(--spacing-sm)) var(--spacing-sm) var(--spacing-sm);
+  }
+  
+  .users-page__title {
+    font-size: var(--font-size-xl);
+  }
+  
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}

@@ -1,0 +1,419 @@
+services:
+  # ============ INFRAESTRUCTURA ============
+
+  # --- Keycloak (IdP) ---
+  keycloak-db:
+    image: postgres:15-alpine
+    container_name: triage-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret_2024}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    networks:
+      - triage-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: triage-keycloak
+    command: >
+      start-dev
+      --import-realm
+      --db=postgres
+      --db-url=jdbc:postgresql://keycloak-db:5432/keycloak
+      --db-username=${KEYCLOAK_DB_USER:-keycloak}
+      --db-password=${KEYCLOAK_DB_PASSWORD:-keycloak_secret_2024}
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_secret_2024}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-universidad.json:/opt/keycloak/data/import/realm-universidad.json:ro
+    ports:
+      - "8180:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - triage-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: triage-api-gateway
+    ports:
+      - "8000:80"
+    depends_on:
+      - auth-service
+      - patient-service
+      - triage-service
+      - appointment-service
+      - notification-service
+      - followup-service
+      - analytics-service
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: triage-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-triage_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-triage_secret_2024}
+      POSTGRES_MULTIPLE_DATABASES: auth_db,patient_db,triage_db,appointment_db,followup_db,analytics_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgresql/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - triage-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-triage_admin}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:6.0
+    container_name: triage-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-mongo_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-mongo_secret_2024}
+      MONGO_INITDB_DATABASE: logs_db
+    volumes:
+      - mongodb_data:/data/db
+      - ./database/mongodb/init:/docker-entrypoint-initdb.d
+    ports:
+      - "27017:27017"
+    networks:
+      - triage-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: triage-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret_2024}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - triage-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret_2024}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: triage-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbit_admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbit_secret_2024}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - triage-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============ MICROSERVICIOS ============
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./services/auth-service/Dockerfile
+    container_name: triage-auth-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/auth_db
+      JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_2024}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_2024}@redis:6379
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5001/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  patient-service:
+    build:
+      context: .
+      dockerfile: ./services/patient-service/Dockerfile
+    container_name: triage-patient-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/patient_db
+      AUTH_SERVICE_URL: http://auth-service:5001
+    ports:
+      - "5002:5002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5002/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  triage-service:
+    build:
+      context: .
+      dockerfile: ./services/triage-service/Dockerfile
+    container_name: triage-triage-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5003
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/triage_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_2024}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
+      AUTH_SERVICE_URL: http://auth-service:5001
+      PATIENT_SERVICE_URL: http://patient-service:5002
+    ports:
+      - "5003:5003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5003/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  appointment-service:
+    build:
+      context: .
+      dockerfile: ./services/appointment-service/Dockerfile
+    container_name: triage-appointment-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5004
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/appointment_db
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
+      AUTH_SERVICE_URL: http://auth-service:5001
+      PATIENT_SERVICE_URL: http://patient-service:5002
+      TRIAGE_SERVICE_URL: http://triage-service:5003
+      JITSI_DOMAIN: ${JITSI_DOMAIN:-meet.jit.si}
+    ports:
+      - "5004:5004"
+    volumes:
+      - prescriptions_data:/app/uploads/prescriptions
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5004/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./services/notification-service/Dockerfile
+    container_name: triage-notification-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5005
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
+      MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:-mongo_secret_2024}@mongodb:27017/logs_db?authSource=admin
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    ports:
+      - "5005:5005"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5005/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  followup-service:
+    build:
+      context: .
+      dockerfile: ./services/followup-service/Dockerfile
+    container_name: triage-followup-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5006
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/followup_db
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
+      AUTH_SERVICE_URL: http://auth-service:5001
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5004
+    ports:
+      - "5006:5006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5006/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: ./services/analytics-service/Dockerfile
+    container_name: triage-analytics-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5007
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/analytics_db
+      MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:-mongo_secret_2024}@mongodb:27017/logs_db?authSource=admin
+      AUTH_SERVICE_URL: http://auth-service:5001
+      PATIENT_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/patient_db
+      TRIAGE_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/triage_db
+      APPOINTMENT_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/appointment_db
+      FOLLOWUP_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secret_2024}@postgres:5432/followup_db
+    ports:
+      - "5007:5007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5007/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============ FRONTEND ============
+
+  frontend:
+    build: ./frontend
+    container_name: triage-frontend
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+  # ============ HERRAMIENTAS ============
+
+  adminer:
+    image: adminer:4.8.1
+    container_name: triage-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:1.0.0-alpha
+    container_name: triage-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER:-mongo_admin}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD:-mongo_secret_2024}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:-mongo_secret_2024}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASS:-admin123}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+networks:
+  triage-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
+  prescriptions_data:
+  keycloak_db_data:
