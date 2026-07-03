@@ -178,6 +178,25 @@ Los 11 issues **Critical** son **100% de un solo tipo**: `S3776` (Cognitive Comp
 
 ---
 
+## Correcciones aplicadas — auditoría completa (Hallazgos 1–10)
+
+### Tabla de hallazgos y verificación
+
+| # | Hallazgo | Severidad | Archivo(s) afectado(s) | Cambio | Verificación |
+|---|----------|-----------|------------------------|--------|--------------|
+| 1 | `audience` condicional en JWT Keycloak | Alta | `auth-service/src/middlewares/keycloak.middleware.js`, `analytics-service/src/middlewares/auth.middleware.js`, `MonetixBackend/src/middlewares/keycloak.middleware.ts` | Eliminado spread condicional; `audience: KEYCLOAK_CLIENT_ID` siempre activo; error fatal al arranque si `KEYCLOAK_JWKS_URI` presente sin `KEYCLOAK_CLIENT_ID` | 4 tests unitarios — token con `aud` incorrecto rechazado, arranque sin `KEYCLOAK_CLIENT_ID` lanza error |
+| 2 | `Math.random()` para sala Jitsi | Media | `appointment-service/src/services/jitsi.service.js` | `Math.random().toString(36).substring(2,8)` → `crypto.randomBytes(6).toString('hex')` (12 chars hex) | 10 tests: longitud, no-colisión en 1000 iteraciones |
+| 3 | Cobertura 0% en SonarQube | Media | `*/sonar-project.properties`, `scripts/sonar-scan.sh`, `*/jest.config.js` | `test:coverage` genera lcov en cada proyecto; sonar-scan.sh ejecuta cobertura antes del análisis; `sonar.javascript.lcov.reportPaths` configurado | MonetixBackend: 30.5%, MonetixFrontend: 66.3% (Quality Gate OK) |
+| 4 | Complejidad cognitiva alta | Media | `analytics.routes.js`, `auth.middleware.js`, `decisionTree.service.js`, `GeminiService.ts`, `Predictions.tsx`, `kpi.service.js` | Extracción de funciones auxiliares: `buildKpiRows`, `sendCsv`, `sendExcel`, `resolveRole`, `getSigningKey`, `verifyJwt`, `buildPrompt`, `callGeminiAPI`, `parseAIResponse`, `buildPredictionChartData`, tabla de reglas en decisionTree | Suites existentes en verde tras cada refactor |
+| 5 | Vault inicializado con 1 sola clave | Baja | `scripts/vault/init-vault.sh` | Parametrizado `VAULT_KEY_SHARES`/`VAULT_KEY_THRESHOLD` (default 1/1); comentario de producción recomendando 5/3 | `.env.example` actualizado |
+| 6 | Root token de Vault persistido | Baja-Media | `scripts/vault/init-vault.sh`, `GUIA-TECNICA-PRESENTACION.md` | Bloque opcional `VAULT_REVOKE_ROOT_TOKEN=true` que revoca con `-self` tras crear AppRoles | Guía técnica documenta `vault operator generate-root` para recuperación |
+| 7 | `X-Service-Token` sin anti-replay | Media-Alta | `shared/utils/serviceAuth.js`, `shared/middlewares/gatewayAuth.middleware.js`, `MonetixBackend/src/middlewares/serviceAuth.middleware.ts` | `jti: crypto.randomUUID()` en firma; `verifyServiceToken()` verifica jti en Redis con TTL 35s; fail-closed si Redis no responde | 7 tests: replay rechazado (`SERVICE_TOKEN_REPLAYED`), fail-closed (`SERVICE_REPLAY_CHECK_FAILED`), token sin jti rechazado |
+| 8 | Sin test de regresión para mapeo de roles | Baja | `scripts/federation/migrate-users.js` | Extraída `resolveKeycloakRole(rawRole, roleMap, fallback)` exportable; warning explícito en stderr para roles desconocidos/null; `require.main === module` para no ejecutar `main()` en tests | 9 tests de regresión: MAYÚSCULAS, minúsculas, null, vacío, rol inexistente |
+| 9 | Cliente Vault duplicado sin documentación | Baja | `shared/utils/vault.js`, `MonetixBackend/src/services/vault.service.ts` | Comentario de cabecera en ambos archivos indicando implementación paralela intencional y alerta de sincronización manual | Sin cambio funcional — solo documentación preventiva |
+| 10 | SQL Injection en `kpi.service.js` | Alta | `analytics-service/src/services/kpi.service.js` | Verificadas las 7 ubicaciones — todas usan `replacements` parametrizados (ya corregido); no quedan interpolaciones directas | 2 tests de regresión: payload `'; DROP TABLE patients; --` nunca aparece en SQL; `calculateKPIs()` devuelve estructura válida sin error |
+
+---
+
 ## Correcciones aplicadas — auditoría de seguimiento (Hallazgo 3)
 
 ### Integración de cobertura de tests al pipeline de SonarQube
