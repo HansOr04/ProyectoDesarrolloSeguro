@@ -115,9 +115,9 @@ services:
       start-dev
       --import-realm
       --db=postgres
-      --db-url=jdbc:postgresql://postgres:5432/keycloak
-      --db-username=${POSTGRES_USER:-triage_admin}
-      --db-password=${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}
+      --db-url=jdbc:postgresql://keycloak-db:5432/keycloak
+      --db-username=${KEYCLOAK_DB_USER:-keycloak}
+      --db-password=${KEYCLOAK_DB_PASSWORD:?ERROR - define KEYCLOAK_DB_PASSWORD en .env}
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?ERROR - define KEYCLOAK_ADMIN_PASSWORD en .env}
@@ -129,7 +129,7 @@ services:
     ports:
       - "8180:8080"
     depends_on:
-      postgres:
+      keycloak-db:
         condition: service_healthy
     networks:
       - proyecto-network
