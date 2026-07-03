@@ -180,6 +180,32 @@ async function getToken() {
 }
 ```
 
+#### Inicialización y gestión de claves de unseal
+
+`scripts/vault/init-vault.sh` acepta dos variables de entorno:
+
+| Variable | Default (dev) | Recomendado en producción |
+|---|---|---|
+| `VAULT_KEY_SHARES` | `1` | `5` |
+| `VAULT_KEY_THRESHOLD` | `1` | `3` |
+
+Con `1/1` (entorno académico), una sola clave desbloquea Vault. En producción se generan 5 fragmentos y se requieren 3 para desbloquear, distribuyendo los fragmentos entre distintos responsables de seguridad.
+
+**Revocación del root token** (`VAULT_REVOKE_ROOT_TOKEN=true`):
+Una vez que los AppRoles funcionan, el root token puede revocarse para minimizar superficie de ataque. El script lo hace automáticamente si la variable está activa:
+```sh
+vault token revoke -self   # el script lo ejecuta tras crear roles y secret_ids
+```
+Para recuperar acceso administrativo posterior:
+```sh
+# Necesitas los VAULT_KEY_SHARES fragmentos de unseal:
+vault operator generate-root -init
+vault operator generate-root -nonce=<nonce> -otp=<otp> <unseal_key_1>
+vault operator generate-root -nonce=<nonce> -otp=<otp> <unseal_key_2>
+# ... hasta alcanzar VAULT_KEY_THRESHOLD fragmentos
+vault operator generate-root -decode=<encoded_token> -otp=<otp>
+```
+
 ### 4.3 Seguridad Inter-Servicio — Gateway Token y Service Token
 
 Dos capas de protección independientes para comunicaciones internas:

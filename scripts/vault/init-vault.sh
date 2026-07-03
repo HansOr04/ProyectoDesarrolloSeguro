@@ -192,3 +192,19 @@ echo "    VAULT_SECRET_ID:  [OMITIDO — consultar vault directamente]"
 echo ""
 echo "  Agrega VAULT_ROLE_ID y VAULT_SECRET_ID al .env de cada servicio."
 echo "======================================================"
+
+# ── Revocación opcional del root token ────────────────────────────────────────
+# Activar con VAULT_REVOKE_ROOT_TOKEN=true en producción, DESPUÉS de haber
+# exportado todos los role_id/secret_id y confirmar que los servicios arrancan.
+# Una vez revocado, futuras operaciones administrativas requieren regenerar el
+# root token con: vault operator generate-root (usando las unseal keys).
+if [ "${VAULT_REVOKE_ROOT_TOKEN:-false}" = "true" ]; then
+  echo ""
+  echo "VAULT_REVOKE_ROOT_TOKEN=true — revocando root token..."
+  vault token revoke -address="${VAULT_ADDR}" -self
+  echo "Root token revocado. Futuras operaciones admin requieren:"
+  echo "  vault operator generate-root (con las unseal keys de $INIT_FILE)"
+  echo ""
+  echo "IMPORTANTE: guarda las unseal keys de $INIT_FILE en un lugar seguro"
+  echo "antes de eliminar este contenedor."
+fi
