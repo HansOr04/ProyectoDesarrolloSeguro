@@ -1,10 +1,22 @@
 #!/bin/sh
 # Sprint 4 — Inicialización de HashiCorp Vault (modo servidor)
 # Maneja: inicialización, unseal, Transit Engine, KV, políticas y AppRole
+#
+# Variables de entorno configurables:
+#   VAULT_KEY_SHARES    — Número de fragmentos de unseal generados (default: 1)
+#   VAULT_KEY_THRESHOLD — Cuántos fragmentos se necesitan para desbloquear (default: 1)
+#
+# RECOMENDACIÓN DE PRODUCCIÓN:
+#   En entornos reales, usar al menos VAULT_KEY_SHARES=5 VAULT_KEY_THRESHOLD=3
+#   y distribuir cada fragmento entre distintos responsables de seguridad.
+#   Con una sola clave (default académico), quien la obtenga puede desbloquear
+#   Vault por sí solo — no aceptable en producción con datos sensibles.
 
 set -e
 
 VAULT_ADDR="${VAULT_ADDR:-http://vault:8200}"
+VAULT_KEY_SHARES="${VAULT_KEY_SHARES:-1}"
+VAULT_KEY_THRESHOLD="${VAULT_KEY_THRESHOLD:-1}"
 INIT_FILE="/vault/data/.vault-init.json"
 
 echo "Esperando que Vault esté disponible..."
@@ -28,8 +40,8 @@ if [ "$INITIALIZED" != "true" ]; then
   echo "Primera ejecucion: inicializando Vault..."
   vault operator init \
     -address="${VAULT_ADDR}" \
-    -key-shares=1 \
-    -key-threshold=1 \
+    -key-shares="${VAULT_KEY_SHARES}" \
+    -key-threshold="${VAULT_KEY_THRESHOLD}" \
     -format=json > "$INIT_FILE"
   chmod 600 "$INIT_FILE"
   echo "Vault inicializado. Credenciales en $INIT_FILE (volumen vault_data — no commitear)"
