@@ -5,6 +5,13 @@ const KEYCLOAK_ISSUER = process.env.KEYCLOAK_ISSUER;
 const KEYCLOAK_JWKS_URI = process.env.KEYCLOAK_JWKS_URI;
 const KEYCLOAK_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID;
 
+if (KEYCLOAK_JWKS_URI && !KEYCLOAK_CLIENT_ID) {
+    throw new Error(
+        '[auth.middleware] KEYCLOAK_CLIENT_ID es obligatorio cuando KEYCLOAK_JWKS_URI ' +
+        'está configurado. Agrega KEYCLOAK_CLIENT_ID al entorno y reinicia el servicio.'
+    );
+}
+
 let jwksClient = null;
 
 function getJwksClient() {
@@ -53,7 +60,7 @@ async function authenticate(req, res, next) {
                 {
                     algorithms: ['RS256'],
                     issuer: KEYCLOAK_ISSUER,
-                    ...(KEYCLOAK_CLIENT_ID ? { audience: KEYCLOAK_CLIENT_ID } : {}),
+                    audience: KEYCLOAK_CLIENT_ID,
                 },
                 (err, p) => {
                     if (err) reject(err);

@@ -5,6 +5,15 @@ const KEYCLOAK_ISSUER = process.env.KEYCLOAK_ISSUER;
 const KEYCLOAK_JWKS_URI = process.env.KEYCLOAK_JWKS_URI;
 const KEYCLOAK_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID;
 
+// Falla en arranque: sin CLIENT_ID no se puede validar audiencia y cualquier
+// token del realm (de otro cliente) sería aceptado indiscriminadamente.
+if (KEYCLOAK_JWKS_URI && !KEYCLOAK_CLIENT_ID) {
+    throw new Error(
+        '[keycloak.middleware] KEYCLOAK_CLIENT_ID es obligatorio cuando KEYCLOAK_JWKS_URI ' +
+        'está configurado. Agrega KEYCLOAK_CLIENT_ID al entorno y reinicia el servicio.'
+    );
+}
+
 // Lazy-initialized JWKS client (solo si Keycloak está configurado)
 let jwksClient = null;
 
@@ -51,7 +60,7 @@ function verifyKeycloakToken(token) {
                 {
                     algorithms: ['RS256'],
                     issuer: KEYCLOAK_ISSUER,
-                    ...(KEYCLOAK_CLIENT_ID ? { audience: KEYCLOAK_CLIENT_ID } : {}),
+                    audience: KEYCLOAK_CLIENT_ID,
                 },
                 (verifyErr, payload) => {
                     if (verifyErr) return reject(verifyErr);
