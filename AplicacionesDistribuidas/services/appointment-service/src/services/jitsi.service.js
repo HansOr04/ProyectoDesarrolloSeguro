@@ -16,7 +16,7 @@ const JITSI_BASE_URL = process.env.JITSI_BASE_URL
  * Genera un nombre de sala único para una teleconsulta
  */
 function generateRoomName(appointmentId) {
-    const randomSuffix = randomBytes(4).toString('hex');
+    const randomSuffix = randomBytes(6).toString('hex');
     return `triage-${appointmentId.substring(0, 8)}-${Date.now()}-${randomSuffix}`;
 }
 
