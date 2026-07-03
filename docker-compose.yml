@@ -127,7 +127,7 @@ services:
     volumes:
       - ./AplicacionesDistribuidas/keycloak/realm-universidad.json:/opt/keycloak/data/import/realm-universidad.json:ro
     ports:
-      - "127.0.0.1:8180:8080"
+      - "8180:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,7 +153,7 @@ services:
       CORS_ORIGIN_TRIAGE: ${CORS_ORIGIN_TRIAGE:-http://localhost:3000}
       CORS_ORIGIN_MONETIX: ${CORS_ORIGIN_MONETIX:-http://localhost:5173}
     ports:
-      - "127.0.0.1:8000:80"
+      - "8000:80"
     depends_on:
       - auth-service
       - patient-service
@@ -412,7 +412,7 @@ services:
         VITE_KEYCLOAK_CLIENT_ID: triage-frontend
     container_name: triage-frontend
     ports:
-      - "127.0.0.1:3000:80"
+      - "3000:80"
     depends_on:
       - api-gateway
     networks:
@@ -451,7 +451,7 @@ services:
       VAULT_ROLE_ID: ${MONETIX_VAULT_ROLE_ID:?ERROR - define MONETIX_VAULT_ROLE_ID en .env}
       VAULT_SECRET_ID: ${MONETIX_VAULT_SECRET_ID:?ERROR - define MONETIX_VAULT_SECRET_ID en .env}
     ports:
-      - "127.0.0.1:3001:4000"
+      - "3001:4000"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -475,7 +475,7 @@ services:
         VITE_KEYCLOAK_CLIENT_ID: monetix-frontend
     container_name: monetix-frontend
     ports:
-      - "127.0.0.1:5173:80"
+      - "5173:80"
     depends_on:
       - monetix-backend
     networks:
