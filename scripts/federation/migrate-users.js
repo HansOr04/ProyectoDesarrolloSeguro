@@ -43,6 +43,28 @@ const MONETIX_ROLE_MAP = {
   user:  'monetix-user',
 };
 
+/**
+ * Mapea un rol crudo de base de datos al rol Keycloak correspondiente.
+ * Normaliza a minúsculas para tolerar diferencias de casing (bug real: 'DOCTOR' → fallback silencioso).
+ * Si el rol no existe en el mapa, devuelve el fallback y registra un aviso.
+ *
+ * @param {string|null|undefined} rawRole  valor del campo role en la BD
+ * @param {Record<string, string>} roleMap  mapa rol-BD → rol-Keycloak
+ * @param {string} fallback  rol Keycloak de fallback si rawRole no está en el mapa
+ * @returns {string}
+ */
+function resolveKeycloakRole(rawRole, roleMap, fallback) {
+  const roleKey = (rawRole || '').toLowerCase();
+  const resolved = roleMap[roleKey];
+  if (!resolved) {
+    process.stderr.write(
+      `[migrate-users] WARN: rol desconocido "${rawRole}" — asignando fallback "${fallback}"\n`
+    );
+    return fallback;
+  }
+  return resolved;
+}
+
 // ── Keycloak Admin API ─────────────────────────────────────────────────────────
 async function getAdminToken() {
   const res = await fetch(`${KC_URL}/realms/master/protocol/openid-connect/token`, {
@@ -210,8 +232,8 @@ async function main() {
     const username = u.username || u.email.split('@')[0];
     if (existing.has(username)) { skipped++; continue; }
 
+    const kcRole   = resolveKeycloakRole(u.role, TRIAGE_ROLE_MAP, 'patient');
     const roleKey  = (u.role || '').toLowerCase();
-    const kcRole   = TRIAGE_ROLE_MAP[roleKey] || 'patient';
     const requiresMfa = ['admin', 'doctor'].includes(roleKey);
 
     console.log(`  → ${username} (${u.email}) role=${kcRole} mfa=${requiresMfa}`);
@@ -245,7 +267,7 @@ async function main() {
     const username  = u.username || u.email.split('@')[0];
     if (existing.has(username)) { skipped++; continue; }
 
-    const kcRole    = MONETIX_ROLE_MAP[u.role] || 'monetix-user';
+    const kcRole    = resolveKeycloakRole(u.role, MONETIX_ROLE_MAP, 'monetix-user');
     const requiresMfa = u.role === 'admin';
 
     console.log(`  → ${username} (${u.email}) role=${kcRole} mfa=${requiresMfa}`);
@@ -281,7 +303,11 @@ async function main() {
   console.log('══════════════════════════════════════════════\n');
 }
 
-main().catch(err => {
-  console.error('Fatal:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('Fatal:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { resolveKeycloakRole, TRIAGE_ROLE_MAP, MONETIX_ROLE_MAP };
