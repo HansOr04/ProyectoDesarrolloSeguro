@@ -44,27 +44,34 @@ function requireGateway(req, res, next) {
 /**
  * Valida X-Service-Token en endpoints de comunicación inter-servicio.
  * Úsalo en rutas que solo deben ser llamadas por otros microservicios, no por usuarios finales.
+ *
+ * @param {import('ioredis').Redis} redisClient  cliente Redis para el check anti-replay
  */
-function requireService(req, res, next) {
-    const token = req.headers['x-service-token'];
+function requireService(redisClient) {
+    return async function (req, res, next) {
+        const token = req.headers['x-service-token'];
 
-    if (!token) {
-        return res.status(401).json({
-            success: false,
-            error: { code: 'SERVICE_TOKEN_MISSING', message: 'Token inter-servicio requerido (X-Service-Token)' },
-        });
-    }
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                error: { code: 'SERVICE_TOKEN_MISSING', message: 'Token inter-servicio requerido (X-Service-Token)' },
+            });
+        }
 
-    try {
-        const payload = verifyServiceToken(token);
-        req.callerService = payload.sub;
-        next();
-    } catch {
-        return res.status(401).json({
-            success: false,
-            error: { code: 'SERVICE_TOKEN_INVALID', message: 'Token inter-servicio inválido o expirado' },
-        });
-    }
+        try {
+            const payload = await verifyServiceToken(token, redisClient);
+            req.callerService = payload.sub;
+            next();
+        } catch (err) {
+            const code = err.code === 'SERVICE_TOKEN_REPLAYED'
+                ? 'SERVICE_TOKEN_REPLAYED'
+                : 'SERVICE_TOKEN_INVALID';
+            return res.status(401).json({
+                success: false,
+                error: { code, message: err.message || 'Token inter-servicio inválido o expirado' },
+            });
+        }
+    };
 }
 
 module.exports = { requireGateway, requireService };

@@ -38,6 +38,9 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/server.js"
+    ],
+    "modulePaths": [
+      "<rootDir>/node_modules"
     ]
   }
 }
