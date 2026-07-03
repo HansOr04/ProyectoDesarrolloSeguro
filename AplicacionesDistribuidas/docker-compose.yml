@@ -56,6 +56,10 @@ services:
   api-gateway:
     build: ./api-gateway
     container_name: triage-api-gateway
+    environment:
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
+      CORS_ORIGIN_TRIAGE: ${CORS_ORIGIN_TRIAGE}
+      CORS_ORIGIN_MONETIX: ${CORS_ORIGIN_MONETIX}
     ports:
       - "8000:80"
     depends_on:
