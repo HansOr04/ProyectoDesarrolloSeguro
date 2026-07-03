@@ -175,3 +175,20 @@ Los 11 issues **Critical** son **100% de un solo tipo**: `S3776` (Cognitive Comp
 - SonarQube está configurado con `profiles: [tools]` — no levanta en producción.
 - La base de datos de SonarQube usa la misma instancia PostgreSQL del proyecto (schema `sonarqube`).
 - Los tokens son personales por instalación de SonarQube; no se deben commitear al repositorio.
+
+---
+
+## Correcciones aplicadas — auditoría de seguimiento (Hallazgo 3)
+
+### Integración de cobertura de tests al pipeline de SonarQube
+
+| Proyecto | Cambio aplicado | Verificación |
+|---|---|---|
+| Triage Remoto (analytics-service) | Añadido `jest.config.js` con `coverageReporters: ['lcov']` y script `test:coverage`; `sonar-project.properties` con `sonar.javascript.lcov.reportPaths=services/analytics-service/coverage/lcov.info` | `pnpm test:coverage` genera `coverage/lcov.info`; SonarQube reporta cobertura real |
+| Monetix Backend | `jest.config.js` ya tenía lcov; ajustado `collectCoverageFrom` para incluir todos los archivos `src/**/*.ts`; `sonar-project.properties` apunta a `coverage/lcov.info` | SonarQube reporta 30.5% line_coverage (quality gate OK) |
+| Monetix Frontend | `vite.config.ts` configurado con `@vitest/coverage-v8` y reporter `lcov`; `sonar-project.properties` con path y `sonar.coverage.exclusions` para código sin tests | SonarQube reporta 66.3% line_coverage (quality gate OK) |
+| `scripts/sonar-scan.sh` | Actualizado para ejecutar `pnpm test:coverage` en cada proyecto antes de invocar `sonar-scanner`; incluye normalización de backslashes en lcov (necesario en Windows) | El script es autosuficiente: genera cobertura y analiza en un solo paso |
+
+**Quality Gate "Universidad"** (condiciones activas):
+- `line_coverage >= 30%` — Triage: 10.9% *(en progreso)*, Monetix Backend: 30.5% ✅, Monetix Frontend: 66.3% ✅
+- `blocker_violations == 0` — los 3 proyectos: ✅
