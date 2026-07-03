@@ -165,52 +165,52 @@ export class LinearRegressionModel implements IPredictionModel {
     return result;
   }
 
+  private buildAugmented(matrix: number[][]): number[][] {
+    const size = matrix.length;
+    return matrix.map((row, i) => {
+      const identity = Array.from({ length: size }, (_, j) => (i === j ? 1 : 0));
+      return [...row, ...identity];
+    });
+  }
+
+  private findPivotRow(augmented: number[][], col: number, startRow: number): number {
+    let maxRow = startRow;
+    for (let k = startRow + 1; k < augmented.length; k++) {
+      if (Math.abs(augmented[k][col]) > Math.abs(augmented[maxRow][col])) {
+        maxRow = k;
+      }
+    }
+    return maxRow;
+  }
+
+  private scalePivotRow(augmented: number[][], row: number): void {
+    const pivot = augmented[row][row];
+    if (Math.abs(pivot) < 1e-10) throw new Error('Matriz singular, no se puede invertir');
+    const width = augmented[row].length;
+    for (let j = 0; j < width; j++) augmented[row][j] /= pivot;
+  }
+
+  private eliminateOtherRows(augmented: number[][], pivotRow: number): void {
+    const width = augmented[pivotRow].length;
+    for (let k = 0; k < augmented.length; k++) {
+      if (k === pivotRow) continue;
+      const factor = augmented[k][pivotRow];
+      for (let j = 0; j < width; j++) augmented[k][j] -= factor * augmented[pivotRow][j];
+    }
+  }
+
   private inverseMatrix(matrix: number[][]): number[][] {
     const size = matrix.length;
-    const augmented: number[][] = [];
+    const augmented = this.buildAugmented(matrix);
 
     for (let i = 0; i < size; i++) {
-      augmented[i] = [...matrix[i]];
-      for (let j = 0; j < size; j++) {
-        augmented[i].push(i === j ? 1 : 0);
-      }
-    }
-
-    for (let i = 0; i < size; i++) {
-      let maxRow = i;
-      for (let k = i + 1; k < size; k++) {
-        if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
-          maxRow = k;
-        }
-      }
-
+      const maxRow = this.findPivotRow(augmented, i, i);
       [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
-
-      const pivot = augmented[i][i];
-      if (Math.abs(pivot) < 1e-10) {
-        throw new Error('Matriz singular, no se puede invertir');
-      }
-
-      for (let j = 0; j < 2 * size; j++) {
-        augmented[i][j] /= pivot;
-      }
-
-      for (let k = 0; k < size; k++) {
-        if (k !== i) {
-          const factor = augmented[k][i];
-          for (let j = 0; j < 2 * size; j++) {
-            augmented[k][j] -= factor * augmented[i][j];
-          }
-        }
-      }
+      this.scalePivotRow(augmented, i);
+      this.eliminateOtherRows(augmented, i);
     }
 
-    const inverse: number[][] = [];
-    for (let i = 0; i < size; i++) {
-      inverse[i] = augmented[i].slice(size);
-    }
-
-    return inverse;
+    return augmented.map(row => row.slice(size));
   }
 
   private predictValue(xValue: number): number {

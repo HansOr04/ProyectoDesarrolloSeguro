@@ -2,6 +2,7 @@
  * Jitsi Meet Integration Service
  * Soporta Jitsi local (http://) y público (https://)
  */
+const { randomBytes } = require('node:crypto');
 
 const JITSI_DOMAIN = process.env.JITSI_DOMAIN || 'meet.jit.si';
 
@@ -15,9 +16,8 @@ const JITSI_BASE_URL = process.env.JITSI_BASE_URL
  * Genera un nombre de sala único para una teleconsulta
  */
 function generateRoomName(appointmentId) {
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    return `triage-${appointmentId.substring(0, 8)}-${timestamp}-${randomSuffix}`;
+    const randomSuffix = randomBytes(4).toString('hex');
+    return `triage-${appointmentId.substring(0, 8)}-${Date.now()}-${randomSuffix}`;
 }
 
 /**

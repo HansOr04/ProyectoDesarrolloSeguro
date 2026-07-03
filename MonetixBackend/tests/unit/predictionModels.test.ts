@@ -289,10 +289,10 @@ describe('LinearRegressionModel Unit Tests', () => {
 
             const metadata = model.getMetadata();
 
-            expect(metadata.mae).toBeDefined();
-            expect(metadata.rmse).toBeDefined();
-            expect(typeof metadata.mae).toBe('number');
-            expect(typeof metadata.rmse).toBe('number');
+            expect(metadata.meanAbsoluteError).toBeDefined();
+            expect(metadata.rootMeanSquaredError).toBeDefined();
+            expect(typeof metadata.meanAbsoluteError).toBe('number');
+            expect(typeof metadata.rootMeanSquaredError).toBe('number');
         });
 
         it('should include coefficients in metadata', () => {

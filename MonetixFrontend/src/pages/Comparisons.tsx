@@ -48,124 +48,85 @@ const Comparisons: React.FC = () => {
     }
   };
 
+  const fetchCategoryData = async () => {
+    if (!selectedCategory) return;
+    const result = await comparisonsService.getByCategory({ categoryId: selectedCategory });
+    setCategoryData(result);
+  };
+
+  const fetchTemporalData = async () => {
+    const result = await comparisonsService.getTemporal({ period: selectedPeriod });
+    setTemporalData(result);
+  };
+
+  const fetchRealVsPredicted = async () => {
+    try {
+      const result = await predictionsService.getAll();
+      let predictions: any[] = [];
+      if (Array.isArray(result)) {
+        predictions = result;
+      } else if ((result as any)?.data && Array.isArray((result as any).data)) {
+        predictions = (result as any).data;
+      } else if ((result as any)?.items) {
+        predictions = (result as any).items;
+      }
+      if (predictions.length === 0) return;
+      const predictionId = predictions[0]._id || predictions[0].id;
+      if (predictionId) {
+        const comparison = await comparisonsService.getRealVsPredicted(predictionId);
+        setRealVsPredicted(comparison);
+      }
+    } catch (err) {
+      console.error('Error fetching predictions for comparison:', err);
+    }
+  };
+
+  const fetchCompareCategories = async () => {
+    if (!selectedCategoryA || !selectedCategoryB) return;
+    const { startDate, endDate } = getDateRange(selectedPeriod);
+    const [incomeStats, expenseStats] = await Promise.all([
+      transactionsService.getByCategory({ startDate, endDate, type: 'income' }),
+      transactionsService.getByCategory({ startDate, endDate, type: 'expense' }),
+    ]);
+    const stats = [...(incomeStats || []), ...(expenseStats || [])];
+
+    const getCategoryStats = (categoryId: string) => {
+      const category = categories.find(c => (c._id || c.id) === categoryId);
+      const stat = stats.find(s => {
+        if (s.category && (s.category._id === categoryId || (s.category as any).id === categoryId)) return true;
+        if ((s as any).categoryId === categoryId) return true;
+        if (typeof (s as any)._id === 'string' && (s as any)._id === categoryId) return true;
+        return false;
+      });
+      return {
+        name: category?.name || 'Unknown',
+        icon: category?.icon || '📦',
+        total: stat ? stat.total : 0,
+        count: stat ? stat.count : 0,
+      };
+    };
+
+    const statsA = getCategoryStats(selectedCategoryA);
+    const statsB = getCategoryStats(selectedCategoryB);
+    const difference = statsA.total - statsB.total;
+    setCompareCategoriesData({
+      categoryA: statsA,
+      categoryB: statsB,
+      comparison: {
+        difference,
+        higherCategory: Math.abs(difference) < 0.01 ? 'equal' : (statsA.total > statsB.total ? 'A' : 'B'),
+      },
+    });
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Fetching data for tab:', activeTab);
-      switch (activeTab) {
-        case 'category':
-          if (selectedCategory) {
-            const result = await comparisonsService.getByCategory({
-              categoryId: selectedCategory
-            });
-            setCategoryData(result);
-          }
-          break;
-        case 'temporal':
-          const tempResult = await comparisonsService.getTemporal({
-            period: selectedPeriod
-          });
-          setTemporalData(tempResult);
-          break;
-        case 'real-vs-predicted':
-          // Fetch predictions and compare with real data
-          try {
-            const result = await predictionsService.getAll();
-            let predictions: any[] = [];
-            
-            // Robust unwrapping similar to Predictions.tsx
-            if (Array.isArray(result)) {
-              predictions = result;
-            } else if ((result as any)?.data && Array.isArray((result as any).data)) {
-              predictions = (result as any).data;
-            } else if ((result as any)?.items) {
-              predictions = (result as any).items;
-            }
-
-            console.log('Predictions found for comparison:', predictions.length, predictions);
-
-            if (predictions.length > 0) {
-              // Prefer finding an expense or income prediction over 'net' if possible, or just take the latest
-              const predictionId = predictions[0]._id || predictions[0].id;
-              if (predictionId) {
-                const comparison = await comparisonsService.getRealVsPredicted(predictionId);
-                setRealVsPredicted(comparison);
-              }
-            } else {
-                console.log('No predictions found to compare');
-            }
-          } catch (err) {
-            console.error('Error fetching predictions for comparison:', err);
-          }
-          break;
-        case 'compare-categories':
-            if (selectedCategoryA && selectedCategoryB) {
-                console.log('Comparing categories:', selectedCategoryA, selectedCategoryB, selectedPeriod);
-                // Calculate dates
-                const { startDate, endDate } = getDateRange(selectedPeriod);
-                console.log('Date range:', startDate, endDate);
-                
-                // Fetch aggregated stats by category for both income and expense
-                const [incomeStats, expenseStats] = await Promise.all([
-                    transactionsService.getByCategory({
-                        startDate,
-                        endDate,
-                        type: 'income'
-                    }),
-                    transactionsService.getByCategory({
-                        startDate,
-                        endDate,
-                        type: 'expense'
-                    })
-                ]);
-
-                const stats = [...(incomeStats || []), ...(expenseStats || [])];
-
-                console.log('Aggregated stats:', stats);
-
-                // Helper to find stats for a category
-                const getCategoryStats = (categoryId: string) => {
-                    const category = categories.find(c => (c._id || c.id) === categoryId);
-                    // Check for nested category object or flat categoryId property
-                    const stat = stats.find(s => {
-                        if (s.category && (s.category._id === categoryId || (s.category as any).id === categoryId)) return true;
-                        if ((s as any).categoryId === categoryId) return true;
-                        // Sometimes _id might be the category id itself if grouped by it
-                        if (typeof (s as any)._id === 'string' && (s as any)._id === categoryId) return true;
-                        return false;
-                    });
-                    
-                    // Fallback if stat is not found (no transactions)
-                    return {
-                        name: category?.name || 'Unknown',
-                        icon: category?.icon || '📦',
-                        total: stat ? stat.total : 0,
-                        count: stat ? stat.count : 0
-                    };
-                };
-
-                const statsA = getCategoryStats(selectedCategoryA);
-                const statsB = getCategoryStats(selectedCategoryB);
-
-                console.log('Stats:', statsA, statsB);
-
-                const difference = statsA.total - statsB.total;
-                const higherCategory = Math.abs(difference) < 0.01 ? 'equal' : (statsA.total > statsB.total ? 'A' : 'B');
-
-                setCompareCategoriesData({
-                    categoryA: statsA,
-                    categoryB: statsB,
-                    comparison: {
-                        difference,
-                        higherCategory
-                    }
-                });
-            } else {
-                console.log('Missing categories for comparison');
-            }
-            break;
-      }
+      if (activeTab === 'category')           await fetchCategoryData();
+      else if (activeTab === 'temporal')      await fetchTemporalData();
+      else if (activeTab === 'real-vs-predicted') await fetchRealVsPredicted();
+      else if (activeTab === 'compare-categories') await fetchCompareCategories();
     } catch (error: any) {
       console.error('Error fetching comparison data:', error);
       setError(error.message || 'Error al cargar los datos');

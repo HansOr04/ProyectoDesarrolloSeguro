@@ -24,6 +24,75 @@ async function initConnections() {
 // Initialize on module load
 initConnections().catch(console.error);
 
+function buildFilter(column, hasRange) {
+    return hasRange ? ` WHERE ${column} BETWEEN :startDate AND :endDate` : '';
+}
+
+function pct(part, total) {
+    return total > 0 ? parseFloat(((part / total) * 100).toFixed(1)) : 0;
+}
+
+async function queryPatients(replacements, hasRange) {
+    const filter = buildFilter('created_at', hasRange);
+    const [rows] = await connections.patient.query(
+        `SELECT COUNT(*) as count FROM patients${filter}`,
+        { replacements }
+    );
+    return parseInt(rows[0]?.count || 0);
+}
+
+async function queryTriages(replacements, hasRange) {
+    const filter = buildFilter('classified_at', hasRange) || ' WHERE 1=1';
+    const [rows] = await connections.triage.query(
+        `SELECT classification, COUNT(*) as count FROM triages${filter} GROUP BY classification`,
+        { replacements }
+    );
+    const byLevel = { ROJO: 0, AMARILLO: 0, VERDE: 0 };
+    rows.forEach(row => { byLevel[row.classification] = parseInt(row.count); });
+    return byLevel;
+}
+
+async function queryAppointments(replacements, hasRange) {
+    const filter = buildFilter('updated_at', hasRange) || ' WHERE 1=1';
+    const [rows] = await connections.appointment.query(
+        `SELECT status, COUNT(*) as count FROM appointments${filter} GROUP BY status`,
+        { replacements }
+    );
+    const stats = {};
+    rows.forEach(row => { stats[row.status] = parseInt(row.count); });
+    return stats;
+}
+
+async function queryFollowupRate(replacements, hasRange) {
+    try {
+        const filter = buildFilter('sent_at', hasRange) || ' WHERE sent_at IS NOT NULL';
+        const [rows] = await connections.followup.query(
+            `SELECT COUNT(*) as total, COUNT(completed_at) as completed FROM followups${filter}`,
+            { replacements }
+        );
+        const total = parseInt(rows[0]?.total || 0);
+        const completed = parseInt(rows[0]?.completed || 0);
+        return total > 0 ? parseFloat((completed / total).toFixed(2)) : 0;
+    } catch (e) {
+        console.warn('Could not get followup stats:', e.message);
+        return 0;
+    }
+}
+
+async function queryPrescriptions(replacements, hasRange) {
+    try {
+        const filter = buildFilter('issued_at', hasRange);
+        const [rows] = await connections.appointment.query(
+            `SELECT COUNT(*) as count FROM prescriptions${filter}`,
+            { replacements }
+        );
+        return parseInt(rows[0]?.count || 0);
+    } catch (e) {
+        console.warn('Could not get prescription stats:', e.message);
+        return 0;
+    }
+}
+
 /**
  * Calculate KPIs for a date range
  */
@@ -31,80 +100,18 @@ async function calculateKPIs(startDate, endDate) {
     try {
         const hasRange = Boolean(startDate && endDate);
         const replacements = hasRange ? { startDate, endDate } : {};
-        const dateFilter = hasRange ?
-            ` WHERE created_at BETWEEN :startDate AND :endDate` : '';
-        const classifiedAtFilter = hasRange ?
-            ` WHERE classified_at BETWEEN :startDate AND :endDate` : '';
 
-        // Total patients
-        const [patientsResult] = await connections.patient.query(
-            `SELECT COUNT(*) as count FROM patients${dateFilter}`,
-            { replacements }
-        );
-        const totalPatients = parseInt(patientsResult[0]?.count || 0);
+        const totalPatients   = await queryPatients(replacements, hasRange);
+        const triagesByLevel  = await queryTriages(replacements, hasRange);
+        const appointmentStats = await queryAppointments(replacements, hasRange);
+        const followupResponseRate = await queryFollowupRate(replacements, hasRange);
+        const prescriptionsIssued  = await queryPrescriptions(replacements, hasRange);
 
-        // Triages by level
-        const [triagesResult] = await connections.triage.query(
-            `SELECT classification, COUNT(*) as count FROM triages${classifiedAtFilter || ' WHERE 1=1'} GROUP BY classification`,
-            { replacements }
-        );
-        const triagesByLevel = {
-            ROJO: 0, AMARILLO: 0, VERDE: 0
-        };
-        triagesResult.forEach(row => {
-            triagesByLevel[row.classification] = parseInt(row.count);
-        });
         const totalTriages = triagesByLevel.ROJO + triagesByLevel.AMARILLO + triagesByLevel.VERDE;
-
-        // Teleconsults
-        const appointmentFilter = hasRange ?
-            ` WHERE updated_at BETWEEN :startDate AND :endDate` : '';
-
-        const [appointmentsResult] = await connections.appointment.query(
-            `SELECT status, COUNT(*) as count FROM appointments${appointmentFilter || ' WHERE 1=1'} GROUP BY status`,
-            { replacements }
-        );
-        const appointmentStats = {};
-        appointmentsResult.forEach(row => {
-            appointmentStats[row.status] = parseInt(row.count);
-        });
         const teleconsultsCompleted = appointmentStats.COMPLETADA || 0;
         const teleconsultsCancelled = appointmentStats.CANCELADA || 0;
-
-        // In-person visits avoided (87% of VERDE cases)
         const inPersonVisitsAvoided = Math.round(triagesByLevel.VERDE * 0.87);
-
-        // Follow-up response rate
-        let followupResponseRate = 0;
-        try {
-            const followupFilter = hasRange ?
-                ` WHERE sent_at BETWEEN :startDate AND :endDate` : '';
-
-            const [followupResult] = await connections.followup.query(
-                `SELECT COUNT(*) as total, COUNT(completed_at) as completed FROM followups${followupFilter || ' WHERE sent_at IS NOT NULL'}`,
-                { replacements }
-            );
-            const total = parseInt(followupResult[0]?.total || 0);
-            const completed = parseInt(followupResult[0]?.completed || 0);
-            followupResponseRate = total > 0 ? parseFloat((completed / total).toFixed(2)) : 0;
-        } catch (e) {
-            console.warn('Could not get followup stats:', e.message);
-        }
-
-        // Prescriptions issued
-        let prescriptionsIssued = 0;
-        try {
-            const prescriptionFilter = hasRange ?
-                ` WHERE issued_at BETWEEN :startDate AND :endDate` : '';
-
-            const [prescriptionsResult] = await connections.appointment.query(
-                `SELECT COUNT(*) as count FROM prescriptions${prescriptionFilter}`,
-                { replacements }
-            );
-            prescriptionsIssued = parseInt(prescriptionsResult[0]?.count || 0);
-        } catch (e) {
-            console.warn('Could not get prescription stats:', e.message);
-        }
+        const closedConsults = teleconsultsCompleted + teleconsultsCancelled;
 
         return {
             period: { start_date: startDate, end_date: endDate },
@@ -122,12 +129,13 @@ async function calculateKPIs(startDate, endDate) {
             prescriptions_issued: prescriptionsIssued,
             efficiency_metrics: {
                 triage_distribution_pct: {
-                    ROJO: totalTriages > 0 ? parseFloat(((triagesByLevel.ROJO / totalTriages) * 100).toFixed(1)) : 0,
-                    AMARILLO: totalTriages > 0 ? parseFloat(((triagesByLevel.AMARILLO / totalTriages) * 100).toFixed(1)) : 0,
-                    VERDE: totalTriages > 0 ? parseFloat(((triagesByLevel.VERDE / totalTriages) * 100).toFixed(1)) : 0
+                    ROJO:     pct(triagesByLevel.ROJO,     totalTriages),
+                    AMARILLO: pct(triagesByLevel.AMARILLO, totalTriages),
+                    VERDE:    pct(triagesByLevel.VERDE,    totalTriages),
                 },
-                consultation_completion_rate: (teleconsultsCompleted + teleconsultsCancelled) > 0 ?
-                    parseFloat((teleconsultsCompleted / (teleconsultsCompleted + teleconsultsCancelled) * 100).toFixed(1)) : 0
+                consultation_completion_rate: closedConsults > 0
+                    ? parseFloat((teleconsultsCompleted / closedConsults * 100).toFixed(1))
+                    : 0,
             },
             generated_at: new Date().toISOString()
         };

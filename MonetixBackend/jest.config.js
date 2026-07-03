@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/tests'],
+  roots: ['<rootDir>/tests', '<rootDir>/__tests__'],
   testMatch: ['**/*.test.ts'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   collectCoverageFrom: [
@@ -15,5 +15,6 @@ module.exports = {
   },
   clearMocks: true,
   coverageDirectory: 'coverage',
+  coverageReporters: ['lcov', 'text-summary'],
   testTimeout: 30000,
 };
