@@ -134,6 +134,50 @@ describe('kpi.service — calculateKPIs', () => {
     });
 });
 
+describe('kpi.service — SQL injection regression', () => {
+    const SQL_INJECTION = "'; DROP TABLE patients; --";
+
+    it('pasa el payload de inyección como parámetro, nunca interpolado en el SQL', async () => {
+        setupMockQueries([
+            [[{ count: '5' }]],
+            [[{ classification: 'VERDE', count: '2' }]],
+            [[{ status: 'COMPLETADA', count: '1' }]],
+            [[{ total: '0', completed: '0' }]],
+            [[{ count: '0' }]],
+        ]);
+
+        await calculateKPIs(SQL_INJECTION, '2024-12-31');
+
+        // Todas las llamadas a query() deben usar replacements, nunca interpolar el payload
+        expect(mockQuery).toHaveBeenCalled();
+        for (const call of mockQuery.mock.calls) {
+            const [sql, options] = call;
+            // El SQL nunca debe contener el payload directamente
+            expect(sql).not.toContain(SQL_INJECTION);
+            // El payload debe llegar como valor en replacements (tratado como literal)
+            if (options?.replacements?.startDate !== undefined) {
+                expect(options.replacements.startDate).toBe(SQL_INJECTION);
+            }
+        }
+    });
+
+    it('funciona sin errores y devuelve estructura válida con payload de inyección', async () => {
+        setupMockQueries([
+            [[{ count: '0' }]],
+            [[]],
+            [[]],
+            [[{ total: '0', completed: '0' }]],
+            [[{ count: '0' }]],
+        ]);
+
+        const result = await calculateKPIs(SQL_INJECTION, '2024-12-31');
+        // La respuesta es la estructura KPI normal, no un error 500 ni ejecución inesperada
+        expect(result).toHaveProperty('total_patients');
+        expect(result).toHaveProperty('total_triages');
+        expect(result.period.start_date).toBe(SQL_INJECTION);
+    });
+});
+
 describe('kpi.service — getDashboardSummary', () => {
     it('returns today date and triage stats', async () => {
         mockQuery.mockReset();
