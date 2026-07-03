@@ -1,0 +1,14 @@
+{
+  "name": "federation-scripts",
+  "version": "1.0.0",
+  "description": "Scripts de federación de usuarios hacia Keycloak",
+  "scripts": {
+    "migrate": "node migrate-users.js",
+    "migrate:dry": "node migrate-users.js --dry-run"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "mongodb": "^6.3.0",
+    "pg": "^8.11.3"
+  }
+}

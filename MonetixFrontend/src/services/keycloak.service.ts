@@ -22,8 +22,9 @@ export async function initKeycloak(): Promise<Keycloak> {
   await keycloak.init({
     onLoad: 'check-sso',
     pkceMethod: 'S256',
-    silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
-    checkLoginIframe: false,
+    silentCheckSsoRedirectUri: `${globalThis.location.origin}/silent-check-sso.html`,
+    checkLoginIframe: true,
+    checkLoginIframeInterval: 5,
   });
 
   _initialized = true;
@@ -31,7 +32,12 @@ export async function initKeycloak(): Promise<Keycloak> {
   keycloak.onTokenExpired = () => {
     keycloak.updateToken(60).catch(() => {
       console.warn('[Keycloak] Sesión expirada, no se pudo renovar el token');
+      keycloak.logout({ redirectUri: `${globalThis.location.origin}/login` });
     });
+  };
+
+  keycloak.onAuthLogout = () => {
+    globalThis.location.href = `${globalThis.location.origin}/login`;
   };
 
   return keycloak;
@@ -41,14 +47,14 @@ export async function initKeycloak(): Promise<Keycloak> {
  * Redirige al login de Keycloak.
  */
 export function loginWithSSO(): void {
-  keycloak.login({ redirectUri: `${window.location.origin}/` });
+  keycloak.login({ redirectUri: `${globalThis.location.origin}/` });
 }
 
 /**
  * Cierra sesión en Keycloak.
  */
 export function logoutSSO(): void {
-  keycloak.logout({ redirectUri: `${window.location.origin}/login` });
+  keycloak.logout({ redirectUri: `${globalThis.location.origin}/login` });
 }
 
 export function isKeycloakAuthenticated(): boolean {
@@ -75,11 +81,18 @@ export function getKeycloakUser(): User | null {
   };
 
   const roles = p.roles ?? [];
+
+  // Solo cuentas con un rol de Monetix pueden entrar a este sistema. Sin este
+  // chequeo, cualquier usuario SSO del realm "universidad" (p.ej. uno creado
+  // solo para Triage) quedaba autenticado igual.
+  const monetixRoles = ['monetix-user', 'monetix-admin'];
+  if (!roles.some((r) => monetixRoles.includes(r))) return null;
+
   const role: 'user' | 'admin' =
     roles.includes('monetix-admin') || roles.includes('admin') ? 'admin' : 'user';
 
   return {
-    id:    p.sub ?? '',
+    _id:   p.sub ?? '',
     email: p.email ?? '',
     name:  p.given_name
       ? `${p.given_name} ${p.family_name ?? ''}`.trim()

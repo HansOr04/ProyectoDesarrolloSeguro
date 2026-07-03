@@ -9,7 +9,8 @@ const { connectRedis } = require('./config/redis');
 const triageRoutes = require('./routes/triage.routes');
 const { errorHandler } = require('../../../shared/utils/errorHandler');
 const { createLogger } = require('../../../shared/utils/logger');
-const { connect: connectRabbitMQ } = require('../../../shared/config/rabbitmq');
+const { connect: connectRabbitMQ, consumeQueue, QUEUES } = require('../../../shared/config/rabbitmq');
+const classificationService = require('./services/classification.service');
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -59,6 +60,16 @@ async function startServer() {
 
         await connectRabbitMQ();
         logger.info('RabbitMQ connection established successfully');
+
+        // Cuando el médico finaliza una teleconsulta (appointment-service publica
+        // appointment.completed), se marca el triage asociado como ATENDIDO —
+        // esto a su vez dispara la notificación cifrada hacia Monetix.
+        await consumeQueue(QUEUES.TRIAGE_APPOINTMENT_COMPLETION, async (message) => {
+            const { triage_id, doctor_id } = message;
+            if (!triage_id) return;
+            await classificationService.updateTriageStatus(triage_id, 'ATENDIDO', doctor_id || null);
+            logger.info(`Triage ${triage_id} marcado ATENDIDO por finalización de cita`);
+        });
 
         // Tables are created by SQL init scripts
         // await sequelize.sync({ alter: true });

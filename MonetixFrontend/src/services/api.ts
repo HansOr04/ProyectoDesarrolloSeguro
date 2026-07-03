@@ -1,6 +1,7 @@
 // src/services/api.ts
 
 import axios from 'axios';
+import { getKeycloakToken } from './keycloak.service';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -13,9 +14,11 @@ export const api = axios.create({
 });
 
 // Interceptor para agregar token automáticamente
+// SSO users: token comes from Keycloak SDK (in-memory, auto-refreshed — never localStorage)
+// Local JWT users: token comes from localStorage (stored by authService.saveAuthData)
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getKeycloakToken() ?? localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -34,7 +37,7 @@ api.interceptors.response.use(
       // Token inválido o expirado
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      globalThis.location.href = '/login';
     }
     return Promise.reject(error);
   }

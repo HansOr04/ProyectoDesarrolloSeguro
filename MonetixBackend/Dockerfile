@@ -1,15 +1,25 @@
 FROM node:20-alpine AS builder
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && npm install -g pnpm
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN pnpm run build
 
 FROM node:20-alpine
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && npm install -g pnpm
 WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --prod
 COPY --from=builder /app/dist ./dist
-EXPOSE 3000
+
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+EXPOSE 4000
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:4000/ || exit 1
 CMD ["node", "dist/server.js"]

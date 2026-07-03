@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
     AUTH: {
         LOGIN: `${API_BASE_URL}/auth/login`,
         REGISTER: `${API_BASE_URL}/auth/register`,
+        REGISTER_KEYCLOAK: `${API_BASE_URL}/auth/register-keycloak`,
         REFRESH: `${API_BASE_URL}/auth/refresh-token`,
         PROFILE: `${API_BASE_URL}/auth/profile`,
         DOCTORS: `${API_BASE_URL}/auth/doctors`

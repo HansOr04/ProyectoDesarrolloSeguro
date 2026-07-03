@@ -1,17 +1,21 @@
 FROM node:18-alpine
-WORKDIR /app/services/appointment-service
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && npm install -g pnpm
 
-# Copy shared utilities to maintain relative path ../../../shared
-COPY shared /app/shared
 WORKDIR /app/shared
-RUN npm install --omit=dev
+COPY shared /app/shared
+RUN pnpm install --prod
 
-# Copy and install service
 WORKDIR /app/services/appointment-service
-COPY services/appointment-service/package*.json ./
-RUN npm install --omit=dev
+COPY services/appointment-service/package.json ./
+RUN pnpm install --prod
 COPY services/appointment-service/ .
 
-RUN mkdir -p logs uploads/prescriptions uploads/referrals
+RUN mkdir -p logs uploads/prescriptions uploads/referrals \
+    && chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 5004
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5004/health || exit 1
 CMD ["node", "src/server.js"]

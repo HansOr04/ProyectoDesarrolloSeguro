@@ -14,7 +14,8 @@ const QUEUES = {
     EMAIL: 'email_queue',
     FOLLOWUP: 'followup_queue',
     TRIAGE_EVENTS: 'triage_events_queue',
-    APPOINTMENT_EVENTS: 'appointment_events_queue'
+    APPOINTMENT_EVENTS: 'appointment_events_queue',
+    TRIAGE_APPOINTMENT_COMPLETION: 'triage_appointment_completion_queue'
 };
 
 const ROUTING_KEYS = {
@@ -59,6 +60,7 @@ async function connect() {
             await channel.assertQueue(QUEUES.FOLLOWUP, queueOptions);
             await channel.assertQueue(QUEUES.TRIAGE_EVENTS, queueOptions);
             await channel.assertQueue(QUEUES.APPOINTMENT_EVENTS, queueOptions);
+            await channel.assertQueue(QUEUES.TRIAGE_APPOINTMENT_COMPLETION, queueOptions);
 
             // Bind queues to exchanges with routing keys
             await channel.bindQueue(QUEUES.SMS, EXCHANGES.NOTIFICATIONS, ROUTING_KEYS.SMS);
@@ -66,6 +68,7 @@ async function connect() {
             await channel.bindQueue(QUEUES.FOLLOWUP, EXCHANGES.NOTIFICATIONS, ROUTING_KEYS.FOLLOWUP);
             await channel.bindQueue(QUEUES.TRIAGE_EVENTS, EXCHANGES.EVENTS, 'triage.*');
             await channel.bindQueue(QUEUES.APPOINTMENT_EVENTS, EXCHANGES.EVENTS, 'appointment.*');
+            await channel.bindQueue(QUEUES.TRIAGE_APPOINTMENT_COMPLETION, EXCHANGES.EVENTS, ROUTING_KEYS.APPOINTMENT_COMPLETED);
 
             // Handle connection events
             connection.on('error', (err) => {

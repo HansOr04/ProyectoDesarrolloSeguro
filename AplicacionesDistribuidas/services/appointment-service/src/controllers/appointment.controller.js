@@ -170,7 +170,8 @@ async function updateAppointmentStatus(req, res, next) {
             await publishMessage(EXCHANGES.EVENTS, ROUTING_KEYS.APPOINTMENT_COMPLETED, {
                 appointment_id: id,
                 patient_id: appointment.patient_id,
-                doctor_id: appointment.doctor_id
+                doctor_id: appointment.doctor_id,
+                triage_id: appointment.triage_id
             });
         } else if (status === 'CANCELADA') {
             await publishMessage(EXCHANGES.EVENTS, ROUTING_KEYS.APPOINTMENT_CANCELLED, {

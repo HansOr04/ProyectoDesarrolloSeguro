@@ -85,7 +85,9 @@ CREATE TABLE IF NOT EXISTS triages (
     doctor_id UUID,
     doctor_notes TEXT,
     reviewed_at TIMESTAMP,
-    status VARCHAR(20) DEFAULT 'PENDIENTE' CHECK (status IN ('PENDIENTE', 'EN_ATENCION', 'ATENDIDO', 'DERIVADO'))
+    status VARCHAR(20) DEFAULT 'PENDIENTE' CHECK (status IN ('PENDIENTE', 'EN_ATENCION', 'ATENDIDO', 'DERIVADO')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabla de respuestas del cuestionario

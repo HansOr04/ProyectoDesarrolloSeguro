@@ -2,22 +2,52 @@
   "realm": "universidad",
   "displayName": "Universidad - Triage & Monetix",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "all",
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
   "accessTokenLifespan": 3600,
-  "ssoSessionIdleTimeout": 1800,
-  "ssoSessionMaxLifespan": 36000,
+  "ssoSessionIdleTimeout": 7200,
+  "ssoSessionMaxLifespan": 86400,
+  "browserFlow": "browser-with-otp",
   "roles": {
     "realm": [
-      { "name": "doctor",        "description": "Médico del sistema Triage" },
-      { "name": "patient",       "description": "Paciente del sistema Triage" },
-      { "name": "admin",         "description": "Administrador (ambos sistemas)" },
-      { "name": "monetix-user",  "description": "Usuario del sistema Monetix" },
-      { "name": "monetix-admin", "description": "Administrador del sistema Monetix" }
+      {
+        "name": "mfa",
+        "description": "Requiere autenticación multifactor (TOTP). Asignado automáticamente vía roles compuestos."
+      },
+      {
+        "name": "admin",
+        "description": "Administrador (ambos sistemas)",
+        "composite": true,
+        "composites": { "realm": ["mfa"] }
+      },
+      {
+        "name": "doctor",
+        "description": "Médico del sistema Triage",
+        "composite": true,
+        "composites": { "realm": ["mfa"] }
+      },
+      {
+        "name": "patient",
+        "description": "Paciente del sistema Triage"
+      },
+      {
+        "name": "monetix-user",
+        "description": "Usuario del sistema Monetix"
+      },
+      {
+        "name": "monetix-admin",
+        "description": "Administrador del sistema Monetix",
+        "composite": true,
+        "composites": { "realm": ["mfa"] }
+      }
     ]
   },
   "clients": [
@@ -32,7 +62,6 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "triage-client-secret-change-me",
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
     },
     {
@@ -44,7 +73,6 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "pkceCodeChallengeMethod": "S256",
       "redirectUris": [
         "http://localhost:3000/*",
         "http://localhost:3001/*"
@@ -52,6 +80,25 @@
       "webOrigins": [
         "http://localhost:3000",
         "http://localhost:3001"
+      ],
+      "frontchannelLogout": true,
+      "attributes": {
+        "frontchannel.logout.url": "http://localhost:3000/",
+        "post.logout.redirect.uris": "http://localhost:3000/##http://localhost:5173/",
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "triage-client-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "triage-client",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
       ],
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
     },
@@ -66,7 +113,6 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "monetix-client-secret-change-me",
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
     },
     {
@@ -78,7 +124,6 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "pkceCodeChallengeMethod": "S256",
       "redirectUris": [
         "http://localhost:5173/*",
         "http://localhost:5174/*"
@@ -86,6 +131,25 @@
       "webOrigins": [
         "http://localhost:5173",
         "http://localhost:5174"
+      ],
+      "frontchannelLogout": true,
+      "attributes": {
+        "frontchannel.logout.url": "http://localhost:5173/",
+        "post.logout.redirect.uris": "http://localhost:5173/##http://localhost:3000/",
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "monetix-client-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "monetix-client",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
       ],
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
     }
@@ -111,6 +175,190 @@
           }
         }
       ]
+    },
+    {
+      "name": "email",
+      "description": "OpenID Connect built-in scope: email",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "true" },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "email verified",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "emailVerified",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email_verified",
+            "jsonType.label": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "description": "OpenID Connect built-in scope: profile",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "true" },
+      "protocolMappers": [
+        {
+          "name": "full name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-full-name-mapper",
+          "consentRequired": false,
+          "config": { "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" }
+        },
+        {
+          "name": "family name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": { "userinfo.token.claim": "true", "user.attribute": "lastName", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "family_name", "jsonType.label": "String" }
+        },
+        {
+          "name": "given name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": { "userinfo.token.claim": "true", "user.attribute": "firstName", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "given_name", "jsonType.label": "String" }
+        },
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": { "userinfo.token.claim": "true", "user.attribute": "username", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "preferred_username", "jsonType.label": "String" }
+        }
+      ]
+    }
+  ],
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "browser-with-otp",
+      "description": "Browser flow con OTP condicional para roles admin, doctor y monetix-admin",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "requirement": "ALTERNATIVE",
+          "priority": 25,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "browser-with-otp forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "browser-with-otp forms",
+      "description": "Usuario, contraseña y OTP condicional por rol",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "conditional-otp-subflow",
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "conditional-otp-subflow",
+      "description": "Requiere OTP solo si el usuario tiene el rol mfa",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-role",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "otp-role-condition"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "otp-role-condition",
+      "config": {
+        "condUserRole": "mfa",
+        "noOtpRequiredForHttpBasic": "false"
+      }
     }
   ],
   "users": [
@@ -121,8 +369,9 @@
       "lastName": "Triage",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": false }],
-      "realmRoles": ["admin"]
+      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": true }],
+      "realmRoles": ["admin"],
+      "requiredActions": ["CONFIGURE_TOTP"]
     },
     {
       "username": "doctor-triage",
@@ -131,8 +380,9 @@
       "lastName": "Demo",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "Doctor1234!", "temporary": false }],
-      "realmRoles": ["doctor"]
+      "credentials": [{ "type": "password", "value": "Doctor1234!", "temporary": true }],
+      "realmRoles": ["doctor"],
+      "requiredActions": ["CONFIGURE_TOTP"]
     },
     {
       "username": "paciente-triage",
@@ -141,7 +391,7 @@
       "lastName": "Demo",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "Paciente1234!", "temporary": false }],
+      "credentials": [{ "type": "password", "value": "Paciente1234!", "temporary": true }],
       "realmRoles": ["patient"]
     },
     {
@@ -151,8 +401,9 @@
       "lastName": "Monetix",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": false }],
-      "realmRoles": ["monetix-admin"]
+      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": true }],
+      "realmRoles": ["monetix-admin"],
+      "requiredActions": ["CONFIGURE_TOTP"]
     },
     {
       "username": "user-monetix",
@@ -161,8 +412,18 @@
       "lastName": "Demo",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "User1234!", "temporary": false }],
+      "credentials": [{ "type": "password", "value": "User1234!", "temporary": true }],
       "realmRoles": ["monetix-user"]
+    },
+    {
+      "username": "admin",
+      "email": "admin@universidad.edu",
+      "firstName": "Admin",
+      "lastName": "Universidad",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": true }],
+      "realmRoles": ["admin", "monetix-admin"]
     }
   ]
 }

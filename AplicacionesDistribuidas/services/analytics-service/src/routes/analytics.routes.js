@@ -1,9 +1,11 @@
 const express = require('express');
+const ExcelJS = require('exceljs');
 const router = express.Router();
 const { calculateKPIs, getDashboardSummary } = require('../services/kpi.service');
+const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
 // Get KPIs for date range
-router.get('/kpis', async (req, res, next) => {
+router.get('/kpis', authenticate, authorize('ADMIN', 'DOCTOR'), async (req, res, next) => {
     try {
         const { start_date, end_date } = req.query;
         const kpis = await calculateKPIs(start_date, end_date);
@@ -14,7 +16,7 @@ router.get('/kpis', async (req, res, next) => {
 });
 
 // Get real-time dashboard summary
-router.get('/dashboard', async (req, res, next) => {
+router.get('/dashboard', authenticate, authorize('ADMIN', 'DOCTOR'), async (req, res, next) => {
     try {
         const summary = await getDashboardSummary();
         res.json({ success: true, data: summary });
@@ -23,17 +25,120 @@ router.get('/dashboard', async (req, res, next) => {
     }
 });
 
-// Export data (placeholder)
-router.get('/export', async (req, res, next) => {
+// Export KPIs as JSON, CSV or Excel
+router.get('/export', authenticate, authorize('ADMIN', 'DOCTOR'), async (req, res, next) => {
     try {
         const { format = 'json', start_date, end_date } = req.query;
         const kpis = await calculateKPIs(start_date, end_date);
 
         if (format === 'json') {
-            res.json({ success: true, data: kpis });
-        } else {
-            res.status(501).json({ success: false, message: 'Export format not implemented' });
+            return res.json({ success: true, data: kpis });
         }
+
+        // Flat rows for tabular formats
+        const rows = [
+            ['Período inicio', kpis.period.start_date || 'Todo'],
+            ['Período fin', kpis.period.end_date || 'Todo'],
+            ['Total pacientes', kpis.total_patients],
+            ['Total triajes', kpis.total_triages],
+            ['Triajes ROJO', kpis.triages_by_level.ROJO],
+            ['Triajes AMARILLO', kpis.triages_by_level.AMARILLO],
+            ['Triajes VERDE', kpis.triages_by_level.VERDE],
+            ['% Triajes ROJO', kpis.efficiency_metrics.triage_distribution_pct.ROJO],
+            ['% Triajes AMARILLO', kpis.efficiency_metrics.triage_distribution_pct.AMARILLO],
+            ['% Triajes VERDE', kpis.efficiency_metrics.triage_distribution_pct.VERDE],
+            ['Teleconsultas agendadas', kpis.teleconsults.scheduled],
+            ['Teleconsultas confirmadas', kpis.teleconsults.confirmed],
+            ['Teleconsultas completadas', kpis.teleconsults.completed],
+            ['Teleconsultas canceladas', kpis.teleconsults.cancelled],
+            ['Tasa de completitud (%)', kpis.efficiency_metrics.consultation_completion_rate],
+            ['Visitas presenciales evitadas', kpis.in_person_visits_avoided],
+            ['Tasa de respuesta seguimientos', kpis.followup_response_rate],
+            ['Recetas emitidas', kpis.prescriptions_issued],
+            ['Generado en', kpis.generated_at],
+        ];
+
+        if (format === 'csv') {
+            const csv = rows.map(([label, value]) =>
+                `"${String(label).replace(/"/g, '""')}","${String(value ?? '').replace(/"/g, '""')}"`
+            ).join('\r\n');
+
+            const filename = `kpis_${start_date || 'all'}_${end_date || 'all'}.csv`;
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            return res.send('﻿' + csv); // BOM para Excel
+        }
+
+        if (format === 'excel') {
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Triage Remoto - Analytics';
+            workbook.created = new Date();
+
+            const sheet = workbook.addWorksheet('KPIs');
+
+            // Header row
+            sheet.columns = [
+                { header: 'Indicador', key: 'label', width: 40 },
+                { header: 'Valor', key: 'value', width: 25 },
+            ];
+
+            // Style header
+            sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            sheet.getRow(1).fill = {
+                type: 'pattern', pattern: 'solid',
+                fgColor: { argb: 'FF2563EB' }
+            };
+
+            // Section separators
+            const sections = {
+                0: 'PERÍODO',
+                2: 'PACIENTES Y TRIAJES',
+                7: 'DISTRIBUCIÓN TRIAJES (%)',
+                10: 'TELECONSULTAS',
+                15: 'EFICIENCIA',
+                18: 'METADATOS',
+            };
+
+            rows.forEach(([label, value], idx) => {
+                if (sections[idx] !== undefined) {
+                    const sectionRow = sheet.addRow([sections[idx], '']);
+                    sectionRow.font = { bold: true, italic: true, color: { argb: 'FF1E3A5F' } };
+                    sectionRow.fill = {
+                        type: 'pattern', pattern: 'solid',
+                        fgColor: { argb: 'FFE8F0FE' }
+                    };
+                }
+                const row = sheet.addRow([label, value]);
+                row.getCell(1).font = { color: { argb: 'FF374151' } };
+                // Alternate row color
+                if (idx % 2 === 0) {
+                    row.fill = {
+                        type: 'pattern', pattern: 'solid',
+                        fgColor: { argb: 'FFF9FAFB' }
+                    };
+                }
+            });
+
+            // Border on all cells
+            sheet.eachRow(row => {
+                row.eachCell(cell => {
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                        right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    };
+                });
+            });
+
+            const filename = `kpis_${start_date || 'all'}_${end_date || 'all'}.xlsx`;
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            await workbook.xlsx.write(res);
+            return res.end();
+        }
+
+        res.status(400).json({ success: false, message: 'Formato no soportado. Use: json, csv, excel' });
     } catch (error) {
         next(error);
     }

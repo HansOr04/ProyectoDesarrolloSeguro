@@ -23,16 +23,21 @@ async function init() {
         onLoad: 'check-sso',
         pkceMethod: 'S256',
         silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
-        checkLoginIframe: false,
+        checkLoginIframe: true,
+        checkLoginIframeInterval: 5,
     })
 
     _initialized = true
 
-    // Renovación automática del token 60s antes de expirar
     keycloak.onTokenExpired = () => {
         keycloak.updateToken(60).catch(() => {
             console.warn('[Keycloak] No se pudo renovar el token, sesión expirada')
+            keycloak.logout({ redirectUri: window.location.origin + '/' })
         })
+    }
+
+    keycloak.onAuthLogout = () => {
+        window.location.href = window.location.origin + '/'
     }
 
     return keycloak
@@ -49,7 +54,7 @@ function loginWithSSO() {
  * Cierra la sesión en Keycloak y redirige al login.
  */
 function logoutSSO() {
-    keycloak.logout({ redirectUri: window.location.origin + '/login' })
+    keycloak.logout({ redirectUri: window.location.origin + '/' })
 }
 
 /**
@@ -75,9 +80,12 @@ function getUser() {
     const p = keycloak.tokenParsed
     const roles = p.roles || []
 
+    const triageRoles = ['admin', 'doctor', 'patient']
+    if (!roles.some(r => triageRoles.includes(r))) return null
+
     let role = 'PATIENT'
-    if (roles.includes('admin'))   role = 'ADMIN'
-    else if (roles.includes('doctor')) role = 'DOCTOR'
+    if (roles.includes('admin'))        role = 'ADMIN'
+    else if (roles.includes('doctor'))  role = 'DOCTOR'
 
     return {
         id:       p.sub,

@@ -86,9 +86,8 @@ async function optionalAuth(req, res, next) {
         }
 
         next();
-    } catch (error) {
-        // optionalAuth no falla: token inválido se trata como "sin sesión"
-        console.debug('optionalAuth: token ignorado —', error.message);
+    } catch {
+        // optionalAuth: token inválido se trata como sesión anónima
         next();
     }
 }

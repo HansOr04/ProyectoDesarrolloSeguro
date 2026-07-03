@@ -8,7 +8,6 @@ import {
   loginWithSSO,
   logoutSSO,
   isKeycloakAuthenticated,
-  getKeycloakToken,
   getKeycloakUser,
 } from '@/services/keycloak.service';
 
@@ -37,8 +36,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const kcUser = getKeycloakUser();
           if (kcUser) {
             setUser(kcUser);
-            localStorage.setItem('token', getKeycloakToken() ?? '');
-            localStorage.setItem('user', JSON.stringify(kcUser));
             setIsLoading(false);
             return;
           }
@@ -87,7 +84,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const value: AuthContextType = useMemo(() => ({

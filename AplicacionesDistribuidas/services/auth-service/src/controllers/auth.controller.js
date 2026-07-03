@@ -306,6 +306,89 @@ async function getDoctors(req, res, next) {
     }
 }
 
+/**
+ * Register user directly in Keycloak — assigns realm role "patient" (Triage-only access)
+ */
+async function registerKeycloak(req, res, next) {
+    try {
+        const { email, password, nombre, apellido } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ success: false, error: { message: 'Email y contraseña requeridos' } });
+        }
+        if (password.length < 8) {
+            return res.status(400).json({ success: false, error: { message: 'La contraseña debe tener al menos 8 caracteres' } });
+        }
+
+        // Derive Keycloak base URL from KEYCLOAK_ISSUER (strips /realms/universidad)
+        const issuer = process.env.KEYCLOAK_ISSUER || 'http://keycloak:8080/realms/universidad';
+        const kcBase = issuer.replace(/\/realms\/[^/]+$/, '');
+        const realm = 'universidad';
+
+        // 1. Admin token via master realm
+        const tokenRes = await fetch(`${kcBase}/realms/master/protocol/openid-connect/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: 'admin-cli',
+                grant_type: 'password',
+                username: process.env.KEYCLOAK_ADMIN || 'admin',
+                password: process.env.KEYCLOAK_ADMIN_PASSWORD,
+            }),
+        });
+        if (!tokenRes.ok) throw new Error('No se pudo autenticar con el administrador de Keycloak');
+        const { access_token } = await tokenRes.json();
+
+        // 2. Create user
+        const createRes = await fetch(`${kcBase}/admin/realms/${realm}/users`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: email.split('@')[0],
+                email,
+                firstName: nombre || '',
+                lastName: apellido || '',
+                enabled: true,
+                emailVerified: true,
+                credentials: [{ type: 'password', value: password, temporary: false }],
+            }),
+        });
+
+        if (createRes.status === 409) {
+            return res.status(409).json({ success: false, error: { message: 'El email ya está registrado en Keycloak' } });
+        }
+        if (!createRes.ok) {
+            const body = await createRes.text();
+            throw new Error(`Keycloak rechazó la creación: ${body}`);
+        }
+
+        // 3. User ID from Location header
+        const userId = createRes.headers.get('location')?.split('/').pop();
+        if (!userId) throw new Error('Keycloak no devolvió el ID del usuario creado');
+
+        // 4. Assign realm role "patient" — scope limitado a Triage
+        const roleRes = await fetch(`${kcBase}/admin/realms/${realm}/roles/patient`, {
+            headers: { 'Authorization': `Bearer ${access_token}` },
+        });
+        if (!roleRes.ok) throw new Error('No se encontró el rol "patient" en Keycloak');
+        const patientRole = await roleRes.json();
+
+        await fetch(`${kcBase}/admin/realms/${realm}/users/${userId}/role-mappings/realm`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify([{ id: patientRole.id, name: patientRole.name }]),
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Cuenta creada en Keycloak. Usa "Iniciar sesión con SSO" para entrar.',
+            data: { email, username: email.split('@')[0], role: 'patient' },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     register,
     login,
@@ -315,5 +398,6 @@ module.exports = {
     changePassword,
     verifyTokenEndpoint,
     getAllUsers,
-    getDoctors
+    getDoctors,
+    registerKeycloak,
 };

@@ -1,8 +1,11 @@
 import jwt from 'jsonwebtoken';
 import jwksRsa, { JwksClient } from 'jwks-rsa';
+import crypto from 'crypto';
+import { User, IUser } from '../models/User.model';
 
 const KEYCLOAK_ISSUER = process.env.KEYCLOAK_ISSUER;
 const KEYCLOAK_JWKS_URI = process.env.KEYCLOAK_JWKS_URI;
+const KEYCLOAK_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID;
 
 let jwksClient: JwksClient | null = null;
 
@@ -57,7 +60,11 @@ export function verifyKeycloakToken(token: string): Promise<KeycloakTokenPayload
       jwt.verify(
         token,
         signingKey,
-        { algorithms: ['RS256'], issuer: KEYCLOAK_ISSUER },
+        {
+          algorithms: ['RS256'],
+          issuer: KEYCLOAK_ISSUER,
+          ...(KEYCLOAK_CLIENT_ID ? { audience: KEYCLOAK_CLIENT_ID } : {}),
+        },
         (verifyErr, payload) => {
           if (verifyErr) return reject(verifyErr);
           resolve(payload as KeycloakTokenPayload);
@@ -103,4 +110,31 @@ export function mapKeycloakPayload(payload: KeycloakTokenPayload) {
     comparePassword: async () => false,
     isKeycloakUser: true,
   };
+}
+
+/**
+ * Resuelve un usuario local de Mongo para un token de Keycloak, creándolo si es
+ * la primera vez que esta cuenta SSO entra a Monetix. El email del IdP es la
+ * clave de enlace: así un usuario con cuenta en Triage y Monetix (mismo email
+ * en Keycloak) obtiene siempre el mismo documento aquí, y req.user.id queda
+ * disponible como ObjectId real para el resto de los controladores.
+ */
+export async function resolveKeycloakUser(payload: KeycloakTokenPayload): Promise<IUser> {
+  const mapped = mapKeycloakPayload(payload);
+  const email = mapped.email || `${payload.sub}@keycloak.local`;
+
+  let user = await User.findOne({ email });
+  if (!user) {
+    user = await User.create({
+      email,
+      name: mapped.name || email,
+      role: mapped.role,
+      password: crypto.randomBytes(32).toString('hex'),
+    });
+  } else if (user.role !== mapped.role) {
+    user.role = mapped.role;
+    await user.save();
+  }
+
+  return user;
 }

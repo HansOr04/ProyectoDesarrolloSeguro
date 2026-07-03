@@ -122,20 +122,6 @@ export default function LoginPage() {
                         </p>
                     </div>
 
-                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                        <p className="text-xs text-gray-500 text-center mb-2">Usuarios de prueba (JWT local):</p>
-                        <div className="text-xs text-gray-600 space-y-1">
-                            <p><strong>Admin:</strong> admin@triage.com / admin123</p>
-                            <p><strong>Doctor:</strong> doctor@triage.com / doctor123</p>
-                            <p><strong>Paciente:</strong> paciente@triage.com / paciente123</p>
-                        </div>
-                        <p className="text-xs text-gray-500 text-center mt-2 mb-1">Usuarios SSO (Keycloak):</p>
-                        <div className="text-xs text-gray-600 space-y-1">
-                            <p><strong>Admin:</strong> admin-triage / Admin1234!</p>
-                            <p><strong>Doctor:</strong> doctor-triage / Doctor1234!</p>
-                            <p><strong>Paciente:</strong> paciente-triage / Paciente1234!</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

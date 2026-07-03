@@ -1,17 +1,20 @@
 FROM node:18-alpine
-WORKDIR /app/services/analytics-service
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && npm install -g pnpm
 
-# Copy shared utilities to maintain relative path ../../../shared
-COPY shared /app/shared
 WORKDIR /app/shared
-RUN npm install --omit=dev
+COPY shared /app/shared
+RUN pnpm install --prod
 
-# Copy and install service
 WORKDIR /app/services/analytics-service
-COPY services/analytics-service/package*.json ./
-RUN npm install --omit=dev
+COPY services/analytics-service/package.json ./
+RUN pnpm install --prod
 COPY services/analytics-service/ .
 
-RUN mkdir -p logs exports
+RUN mkdir -p logs exports && chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 5007
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5007/health || exit 1
 CMD ["node", "src/server.js"]

@@ -23,6 +23,11 @@ export const authService = {
     return response.data.data;
   },
 
+  // Register in Keycloak — assigns monetix-user role (Monetix-only access)
+  async registerKeycloak(data: { email: string; password: string; name?: string }): Promise<void> {
+    await api.post('/auth/register-keycloak', data);
+  },
+
   // Get current user
   async getCurrentUser(): Promise<User> {
     const response = await api.get<ApiResponse<User>>('/auth/me');

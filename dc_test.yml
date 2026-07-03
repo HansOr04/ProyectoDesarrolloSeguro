@@ -1,0 +1,33 @@
+services:
+
+  # ================================================================
+  # INFRAESTRUCTURA COMPARTIDA
+  # ================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: proyecto-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-triage_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR: define POSTGRES_PASSWORD en .env}
+      POSTGRES_MULTIPLE_DATABASES: auth_db,patient_db,triage_db,appointment_db,followup_db,analytics_db,sonarqube
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./AplicacionesDistribuidas/database/postgresql/init:/docker-entrypoint-initdb.d
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - proyecto-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-triage_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:6.0
+
+networks:
+  proyecto-network:

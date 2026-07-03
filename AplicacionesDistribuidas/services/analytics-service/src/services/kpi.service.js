@@ -29,20 +29,24 @@ initConnections().catch(console.error);
  */
 async function calculateKPIs(startDate, endDate) {
     try {
-        const dateFilter = startDate && endDate ?
-            ` WHERE created_at BETWEEN '${startDate}' AND '${endDate}'` : '';
-        const classifiedAtFilter = startDate && endDate ?
-            ` WHERE classified_at BETWEEN '${startDate}' AND '${endDate}'` : '';
+        const hasRange = Boolean(startDate && endDate);
+        const replacements = hasRange ? { startDate, endDate } : {};
+        const dateFilter = hasRange ?
+            ` WHERE created_at BETWEEN :startDate AND :endDate` : '';
+        const classifiedAtFilter = hasRange ?
+            ` WHERE classified_at BETWEEN :startDate AND :endDate` : '';
 
         // Total patients
         const [patientsResult] = await connections.patient.query(
-            `SELECT COUNT(*) as count FROM patients${dateFilter}`
+            `SELECT COUNT(*) as count FROM patients${dateFilter}`,
+            { replacements }
         );
         const totalPatients = parseInt(patientsResult[0]?.count || 0);
 
         // Triages by level
         const [triagesResult] = await connections.triage.query(
-            `SELECT classification, COUNT(*) as count FROM triages${classifiedAtFilter || ' WHERE 1=1'} GROUP BY classification`
+            `SELECT classification, COUNT(*) as count FROM triages${classifiedAtFilter || ' WHERE 1=1'} GROUP BY classification`,
+            { replacements }
         );
         const triagesByLevel = {
             ROJO: 0, AMARILLO: 0, VERDE: 0
@@ -53,11 +57,12 @@ async function calculateKPIs(startDate, endDate) {
         const totalTriages = triagesByLevel.ROJO + triagesByLevel.AMARILLO + triagesByLevel.VERDE;
 
         // Teleconsults
-        const appointmentFilter = startDate && endDate ?
-            ` WHERE updated_at BETWEEN '${startDate}' AND '${endDate}'` : '';
+        const appointmentFilter = hasRange ?
+            ` WHERE updated_at BETWEEN :startDate AND :endDate` : '';
 
         const [appointmentsResult] = await connections.appointment.query(
-            `SELECT status, COUNT(*) as count FROM appointments${appointmentFilter || ' WHERE 1=1'} GROUP BY status`
+            `SELECT status, COUNT(*) as count FROM appointments${appointmentFilter || ' WHERE 1=1'} GROUP BY status`,
+            { replacements }
         );
         const appointmentStats = {};
         appointmentsResult.forEach(row => {
@@ -72,11 +77,12 @@ async function calculateKPIs(startDate, endDate) {
         // Follow-up response rate
         let followupResponseRate = 0;
         try {
-            const followupFilter = startDate && endDate ?
-                ` WHERE sent_at BETWEEN '${startDate}' AND '${endDate}'` : '';
+            const followupFilter = hasRange ?
+                ` WHERE sent_at BETWEEN :startDate AND :endDate` : '';
 
             const [followupResult] = await connections.followup.query(
-                `SELECT COUNT(*) as total, COUNT(completed_at) as completed FROM followups${followupFilter || ' WHERE sent_at IS NOT NULL'}`
+                `SELECT COUNT(*) as total, COUNT(completed_at) as completed FROM followups${followupFilter || ' WHERE sent_at IS NOT NULL'}`,
+                { replacements }
             );
             const total = parseInt(followupResult[0]?.total || 0);
             const completed = parseInt(followupResult[0]?.completed || 0);
@@ -88,11 +94,12 @@ async function calculateKPIs(startDate, endDate) {
         // Prescriptions issued
         let prescriptionsIssued = 0;
         try {
-            const prescriptionFilter = startDate && endDate ?
-                ` WHERE issued_at BETWEEN '${startDate}' AND '${endDate}'` : '';
+            const prescriptionFilter = hasRange ?
+                ` WHERE issued_at BETWEEN :startDate AND :endDate` : '';
 
             const [prescriptionsResult] = await connections.appointment.query(
-                `SELECT COUNT(*) as count FROM prescriptions${prescriptionFilter}`
+                `SELECT COUNT(*) as count FROM prescriptions${prescriptionFilter}`,
+                { replacements }
             );
             prescriptionsIssued = parseInt(prescriptionsResult[0]?.count || 0);
         } catch (e) {
@@ -140,7 +147,8 @@ async function getDashboardSummary() {
 
         // Today's triages
         const [todayTriages] = await connections.triage.query(
-            `SELECT classification, COUNT(*) as count FROM triages WHERE DATE(classified_at) = '${today}' GROUP BY classification`
+            `SELECT classification, COUNT(*) as count FROM triages WHERE DATE(classified_at) = :today GROUP BY classification`,
+            { replacements: { today } }
         );
         const todayStats = { ROJO: 0, AMARILLO: 0, VERDE: 0 };
         todayTriages.forEach(row => {
@@ -154,7 +162,8 @@ async function getDashboardSummary() {
 
         // Today's appointments
         const [todayAppointments] = await connections.appointment.query(
-            `SELECT status, COUNT(*) as count FROM appointments WHERE scheduled_date = '${today}' GROUP BY status`
+            `SELECT status, COUNT(*) as count FROM appointments WHERE scheduled_date = :today GROUP BY status`,
+            { replacements: { today } }
         );
         const appointmentStats = { total: 0, completed: 0, in_progress: 0, pending: 0 };
         todayAppointments.forEach(row => {

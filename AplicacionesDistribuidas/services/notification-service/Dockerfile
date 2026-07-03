@@ -1,17 +1,20 @@
 FROM node:18-alpine
-WORKDIR /app/services/notification-service
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && npm install -g pnpm
 
-# Copy shared utilities to maintain relative path ../../../shared
-COPY shared /app/shared
 WORKDIR /app/shared
-RUN npm install --omit=dev
+COPY shared /app/shared
+RUN pnpm install --prod
 
-# Copy and install service
 WORKDIR /app/services/notification-service
-COPY services/notification-service/package*.json ./
-RUN npm install --omit=dev
+COPY services/notification-service/package.json ./
+RUN pnpm install --prod
 COPY services/notification-service/ .
 
-RUN mkdir -p logs
+RUN mkdir -p logs && chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 5005
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5005/health || exit 1
 CMD ["node", "src/server.js"]

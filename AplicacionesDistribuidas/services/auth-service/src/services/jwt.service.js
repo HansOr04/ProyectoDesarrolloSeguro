@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'default_secret_change_me';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('FATAL: JWT_SECRET no definido. Define TRIAGE_JWT_SECRET en .env');
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const JWT_REFRESH_EXPIRES_IN = '7d';
 
@@ -22,11 +25,7 @@ function generateRefreshToken(payload) {
  * Verify token
  */
 function verifyToken(token) {
-    try {
-        return jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-        throw error;
-    }
+    return jwt.verify(token, JWT_SECRET);
 }
 
 /**

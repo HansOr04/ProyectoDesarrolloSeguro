@@ -20,6 +20,12 @@ const validateLogin = [
 
 // Public routes
 router.post('/register', validateRegister, authController.register);
+router.post('/register-keycloak', [
+    body('email').isEmail().normalizeEmail().withMessage('Email válido requerido'),
+    body('password').isLength({ min: 8 }).withMessage('Contraseña mínimo 8 caracteres'),
+    body('nombre').optional().trim(),
+    body('apellido').optional().trim(),
+], authController.registerKeycloak);
 router.post('/login', validateLogin, authController.login);
 router.post('/refresh-token', authController.refreshToken);
 router.post('/verify-token', authController.verifyTokenEndpoint);
@@ -29,8 +35,8 @@ router.get('/profile', authenticate, authController.getProfile);
 router.put('/profile', authenticate, authController.updateProfile);
 router.post('/change-password', authenticate, authController.changePassword);
 
-// Public route for getting doctors (used by appointment service)
-router.get('/doctors', authController.getDoctors);
+// Lista de doctores — requiere sesión activa (cualquier rol); no es dato público
+router.get('/doctors', authenticate, authController.getDoctors);
 
 // Admin routes
 router.get('/users', authenticate, authorize('ADMIN'), authController.getAllUsers);

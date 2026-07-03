@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const { sequelize } = require('./config/database');
 const authRoutes = require('./routes/auth.routes');
 const { errorHandler } = require('../../../shared/utils/errorHandler');
@@ -33,6 +34,19 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+const authLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'RATE_LIMIT', message: 'Demasiados intentos. Intenta en 1 minuto.' } },
+});
+
+// Protect high-value auth endpoints from brute-force
+app.use('/login', authLimiter);
+app.use('/register', authLimiter);
+app.use('/refresh-token', authLimiter);
 
 // Routes
 app.use('/', authRoutes);

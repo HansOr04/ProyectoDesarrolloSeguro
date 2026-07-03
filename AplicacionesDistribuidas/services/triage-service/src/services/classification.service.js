@@ -3,6 +3,26 @@ const QuestionnaireResponse = require('../models/QuestionnaireResponse');
 const { clasificarTriage, getQuestions } = require('./decisionTree.service');
 const { cacheTriageResult, getCachedTriageResult, invalidateTriageCache } = require('../config/redis');
 const { publishMessage, EXCHANGES, ROUTING_KEYS } = require('../../../../shared/config/rabbitmq');
+const monetixService = require('./monetix.service');
+
+const PATIENT_SERVICE_URL = process.env.PATIENT_SERVICE_URL;
+
+/**
+ * Obtiene el email del paciente desde patient-service.
+ * Se usa solo para enlazar el gasto con su cuenta en Monetix — si falla,
+ * la notificación se envía sin email (Monetix usa un fallback genérico).
+ */
+async function getPatientEmail(patientId) {
+    if (!PATIENT_SERVICE_URL) return null;
+    try {
+        const res = await fetch(`${PATIENT_SERVICE_URL}/${patientId}`);
+        if (!res.ok) return null;
+        const body = await res.json();
+        return body?.data?.email || body?.email || null;
+    } catch {
+        return null;
+    }
+}
 
 /**
  * Process triage questionnaire and return classification
@@ -151,6 +171,20 @@ async function updateTriageStatus(triageId, status, doctorId = null, notes = nul
         new_status: status,
         doctor_id: doctorId
     });
+
+    // Notificar a Monetix cuando el médico cierra la consulta (no-bloqueante)
+    if (status === 'ATENDIDO') {
+        getPatientEmail(triage.patient_id).then((patientEmail) => {
+            return monetixService.notifyConsulta({
+                patientId: triage.patient_id,
+                patientEmail,
+                triageId,
+                classification: triage.classification,
+                doctorId,
+                keycloakSub: doctorId || 'system',
+            });
+        }).catch(() => {}); // errores ya loguea internamente
+    }
 
     return triage;
 }

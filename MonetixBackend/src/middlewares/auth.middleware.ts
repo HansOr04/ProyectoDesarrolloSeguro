@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { Secret } from 'jsonwebtoken';
 import { User } from '../models/User.model';
-import { isKeycloakToken, verifyKeycloakToken, mapKeycloakPayload } from './keycloak.middleware';
+import { isKeycloakToken, verifyKeycloakToken, resolveKeycloakUser } from './keycloak.middleware';
 
 const getJwtSecret = (): Secret => {
   const secret = process.env.JWT_SECRET;
@@ -34,7 +34,7 @@ export const authenticate = async (
     // --- Ruta Keycloak: token emitido por el IdP ---
     if (isKeycloakToken(token)) {
       const payload = await verifyKeycloakToken(token);
-      req.user = mapKeycloakPayload(payload) as any;
+      req.user = await resolveKeycloakUser(payload);
       next();
       return;
     }
@@ -51,8 +51,7 @@ export const authenticate = async (
 
     req.user = user;
     next();
-  } catch (error) {
-    console.error('Error en autenticación:', error);
+  } catch {
     res.status(401).json({ success: false, message: 'Token inválido o expirado' });
   }
 };

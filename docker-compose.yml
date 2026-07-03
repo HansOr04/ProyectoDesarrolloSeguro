@@ -9,20 +9,21 @@ services:
     container_name: proyecto-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-triage_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-triage_secure_password_2024}
-      POSTGRES_MULTIPLE_DATABASES: auth_db,patient_db,triage_db,appointment_db,followup_db,analytics_db
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}
+      POSTGRES_MULTIPLE_DATABASES: auth_db,patient_db,triage_db,appointment_db,followup_db,analytics_db,sonarqube
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./AplicacionesDistribuidas/database/postgresql/init:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     networks:
       - proyecto-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-triage_admin}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   mongodb:
@@ -30,13 +31,13 @@ services:
     container_name: proyecto-mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-mongo_admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-mongo_secret_2024}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?ERROR - define MONGO_PASSWORD en .env}
       MONGO_INITDB_DATABASE: logs_db
     volumes:
       - mongodb_data:/data/db
       - ./AplicacionesDistribuidas/database/mongodb/init:/docker-entrypoint-initdb.d
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     networks:
       - proyecto-network
     healthcheck:
@@ -49,15 +50,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: proyecto-redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret_2024}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?ERROR - define REDIS_PASSWORD en .env}
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     networks:
       - proyecto-network
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret_2024}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?ERROR - define REDIS_PASSWORD en .env}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -68,12 +69,12 @@ services:
     container_name: proyecto-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbit_admin}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbit_secret_2024}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?ERROR - define RABBITMQ_PASSWORD en .env}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     networks:
       - proyecto-network
     healthcheck:
@@ -81,6 +82,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 60s
     restart: unless-stopped
 
   # ================================================================
@@ -93,7 +95,7 @@ services:
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret_2024}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?ERROR - define KEYCLOAK_DB_PASSWORD en .env}
     volumes:
       - keycloak_db_data:/var/lib/postgresql/data
     networks:
@@ -102,7 +104,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   keycloak:
@@ -112,26 +115,26 @@ services:
       start-dev
       --import-realm
       --db=postgres
-      --db-url=jdbc:postgresql://keycloak-db:5432/keycloak
-      --db-username=${KEYCLOAK_DB_USER:-keycloak}
-      --db-password=${KEYCLOAK_DB_PASSWORD:-keycloak_secret_2024}
+      --db-url=jdbc:postgresql://postgres:5432/keycloak
+      --db-username=${POSTGRES_USER:-triage_admin}
+      --db-password=${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_secret_2024}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?ERROR - define KEYCLOAK_ADMIN_PASSWORD en .env}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
     volumes:
       - ./AplicacionesDistribuidas/keycloak/realm-universidad.json:/opt/keycloak/data/import/realm-universidad.json:ro
     ports:
-      - "8180:8080"
+      - "127.0.0.1:8180:8080"
     depends_on:
-      keycloak-db:
+      postgres:
         condition: service_healthy
     networks:
       - proyecto-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080 && echo -e \"GET /health/ready HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && cat <&3 | grep -q \"200 OK\"'"]
       interval: 30s
       timeout: 10s
       retries: 10
@@ -145,8 +148,12 @@ services:
   api-gateway:
     build: ./AplicacionesDistribuidas/api-gateway
     container_name: triage-api-gateway
+    environment:
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      CORS_ORIGIN_TRIAGE: ${CORS_ORIGIN_TRIAGE:-http://localhost:3000}
+      CORS_ORIGIN_MONETIX: ${CORS_ORIGIN_MONETIX:-http://localhost:5173}
     ports:
-      - "8000:80"
+      - "127.0.0.1:8000:80"
     depends_on:
       - auth-service
       - patient-service
@@ -167,14 +174,17 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5001
-      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/auth_db
-      JWT_SECRET: ${TRIAGE_JWT_SECRET:-super_secret_triage_jwt_key_2024}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/auth_db
+      JWT_SECRET: ${TRIAGE_JWT_SECRET:?ERROR - define TRIAGE_JWT_SECRET en .env}
       JWT_EXPIRES_IN: ${TRIAGE_JWT_EXPIRES_IN:-24h}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_2024}@redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:?ERROR - define REDIS_PASSWORD en .env}@redis:6379
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://keycloak:8080/realms/universidad}
       KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI:-http://keycloak:8080/realms/universidad/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: triage-client
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
     ports:
-      - "5001:5001"
+      - "127.0.0.1:5001:5001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -197,10 +207,12 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5002
-      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/patient_db
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/patient_db
       AUTH_SERVICE_URL: http://auth-service:5001
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
     ports:
-      - "5002:5002"
+      - "127.0.0.1:5002:5002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -223,13 +235,20 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5003
-      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/triage_db
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_2024}@redis:6379
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/triage_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:?ERROR - define REDIS_PASSWORD en .env}@redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:?ERROR - define RABBITMQ_PASSWORD en .env}@rabbitmq:5672
       AUTH_SERVICE_URL: http://auth-service:5001
       PATIENT_SERVICE_URL: http://patient-service:5002
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
+      # Flujo A->B: triage-service cifra con Vault y envia a Monetix
+      MONETIX_BACKEND_URL: ${MONETIX_BACKEND_URL:-http://monetix-backend:4000}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_ROLE_ID: ${TRIAGE_VAULT_ROLE_ID:?ERROR - define TRIAGE_VAULT_ROLE_ID en .env}
+      VAULT_SECRET_ID: ${TRIAGE_VAULT_SECRET_ID:?ERROR - define TRIAGE_VAULT_SECRET_ID en .env}
     ports:
-      - "5003:5003"
+      - "127.0.0.1:5003:5003"
     depends_on:
       postgres:
         condition: service_healthy
@@ -254,14 +273,17 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5004
-      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/appointment_db
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/appointment_db
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:?ERROR - define RABBITMQ_PASSWORD en .env}@rabbitmq:5672
       AUTH_SERVICE_URL: http://auth-service:5001
       PATIENT_SERVICE_URL: http://patient-service:5002
       TRIAGE_SERVICE_URL: http://triage-service:5003
-      JITSI_DOMAIN: ${JITSI_DOMAIN:-meet.jit.si}
+      JITSI_DOMAIN: ${JITSI_DOMAIN:-localhost:8443}
+      JITSI_BASE_URL: ${JITSI_BASE_URL:-http://localhost:8443}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
     ports:
-      - "5004:5004"
+      - "127.0.0.1:5004:5004"
     volumes:
       - prescriptions_data:/app/uploads/prescriptions
     depends_on:
@@ -286,17 +308,19 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5005
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
-      MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:-mongo_secret_2024}@mongodb:27017/logs_db?authSource=admin
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:?ERROR - define RABBITMQ_PASSWORD en .env}@rabbitmq:5672
+      MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:?ERROR - define MONGO_PASSWORD en .env}@mongodb:27017/logs_db?authSource=admin
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
+      SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
     ports:
-      - "5005:5005"
+      - "127.0.0.1:5005:5005"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -319,12 +343,14 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5006
-      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/followup_db
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:-rabbit_secret_2024}@rabbitmq:5672
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/followup_db
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_admin}:${RABBITMQ_PASSWORD:?ERROR - define RABBITMQ_PASSWORD en .env}@rabbitmq:5672
       AUTH_SERVICE_URL: http://auth-service:5001
       APPOINTMENT_SERVICE_URL: http://appointment-service:5004
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
     ports:
-      - "5006:5006"
+      - "127.0.0.1:5006:5006"
     depends_on:
       postgres:
         condition: service_healthy
@@ -347,15 +373,20 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 5007
-      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/analytics_db
-      MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:-mongo_secret_2024}@mongodb:27017/logs_db?authSource=admin
+      DATABASE_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/analytics_db
+      MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:?ERROR - define MONGO_PASSWORD en .env}@mongodb:27017/logs_db?authSource=admin
       AUTH_SERVICE_URL: http://auth-service:5001
-      PATIENT_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/patient_db
-      TRIAGE_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/triage_db
-      APPOINTMENT_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/appointment_db
-      FOLLOWUP_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:-triage_secure_password_2024}@postgres:5432/followup_db
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://keycloak:8080/realms/universidad}
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI:-http://keycloak:8080/realms/universidad/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: triage-client
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
+      PATIENT_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/patient_db
+      TRIAGE_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/triage_db
+      APPOINTMENT_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/appointment_db
+      FOLLOWUP_DB_URL: postgresql://${POSTGRES_USER:-triage_admin}:${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}@postgres:5432/followup_db
     ports:
-      - "5007:5007"
+      - "127.0.0.1:5007:5007"
     depends_on:
       postgres:
         condition: service_healthy
@@ -371,15 +402,17 @@ services:
     restart: unless-stopped
 
   triage-frontend:
-    build: ./AplicacionesDistribuidas/frontend
+    build:
+      context: ./AplicacionesDistribuidas/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_TRIAGE_API_URL:-http://localhost:8000/api}
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8180}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-universidad}
+        VITE_KEYCLOAK_CLIENT_ID: triage-frontend
     container_name: triage-frontend
-    environment:
-      VITE_API_URL: ${VITE_TRIAGE_API_URL:-http://localhost:8000/api}
-      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8180}
-      VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-universidad}
-      VITE_KEYCLOAK_CLIENT_ID: triage-frontend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:80"
     depends_on:
       - api-gateway
     networks:
@@ -397,22 +430,35 @@ services:
     container_name: monetix-backend
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      PORT: 3000
-      MONGO_URI: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:-mongo_secret_2024}@mongodb:27017/monetix?authSource=admin
-      JWT_SECRET: ${MONETIX_JWT_SECRET:-super_secret_monetix_jwt_key_2024}
+      # Puerto interno 4000 (no 3000): el host también publica triage-frontend en
+      # 127.0.0.1:3000->80, y en este entorno Docker Desktop/Windows el NAT del
+      # bridge confundia trafico hacia "cualquier IP de contenedor:3000" con esa
+      # regla de publicacion de host, enrutando peticiones de triage-service a
+      # monetix-backend hacia el nginx de triage-frontend en su lugar.
+      PORT: 4000
+      MONGO_URI: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:?ERROR - define MONGO_PASSWORD en .env}@mongodb:27017/monetix?authSource=admin
+      JWT_SECRET: ${MONETIX_JWT_SECRET:?ERROR - define MONETIX_JWT_SECRET en .env}
       JWT_EXPIRES_IN: 7d
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: ${CORS_ORIGIN_MONETIX:-http://localhost:5173}
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://keycloak:8080/realms/universidad}
       KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI:-http://keycloak:8080/realms/universidad/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: monetix-client
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-5}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?ERROR - define INTERNAL_API_SECRET en .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?ERROR - define INTERNAL_SERVICE_SECRET en .env}
+      # Flujo A->B: monetix-backend descifra con Vault Transit los payloads de Triage
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_ROLE_ID: ${MONETIX_VAULT_ROLE_ID:?ERROR - define MONETIX_VAULT_ROLE_ID en .env}
+      VAULT_SECRET_ID: ${MONETIX_VAULT_SECRET_ID:?ERROR - define MONETIX_VAULT_SECRET_ID en .env}
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:4000"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - proyecto-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -429,12 +475,210 @@ services:
         VITE_KEYCLOAK_CLIENT_ID: monetix-frontend
     container_name: monetix-frontend
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     depends_on:
       - monetix-backend
     networks:
       - proyecto-network
     restart: unless-stopped
+
+  # ================================================================
+  # EMAIL LOCAL — MailHog (captura emails, sin envío real)
+  # UI web: http://localhost:8025
+  # ================================================================
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: proyecto-mailhog
+    profiles: [tools]
+    ports:
+      - "127.0.0.1:1025:1025"   # SMTP
+      - "127.0.0.1:8025:8025"   # Web UI
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
+  # ================================================================
+  # VIDEOCONFERENCIA LOCAL — Jitsi Meet
+  # UI: http://localhost:8443
+  # ================================================================
+
+  prosody:
+    image: jitsi/prosody:stable
+    container_name: jitsi-prosody
+    environment:
+      AUTH_TYPE: internal
+      ENABLE_AUTH: 1
+      ENABLE_GUESTS: 1
+      XMPP_DOMAIN: meet.jitsi
+      XMPP_AUTH_DOMAIN: auth.meet.jitsi
+      XMPP_MUC_DOMAIN: muc.meet.jitsi
+      XMPP_INTERNAL_MUC_DOMAIN: internal.auth.meet.jitsi
+      XMPP_GUEST_DOMAIN: guest.meet.jitsi
+      JICOFO_COMPONENT_SECRET: ${JICOFO_COMPONENT_SECRET:?ERROR - define JICOFO_COMPONENT_SECRET en .env}
+      JICOFO_AUTH_PASSWORD: ${JICOFO_AUTH_PASSWORD:?ERROR - define JICOFO_AUTH_PASSWORD en .env}
+      JVB_AUTH_PASSWORD: ${JVB_AUTH_PASSWORD:?ERROR - define JVB_AUTH_PASSWORD en .env}
+      TZ: America/Guayaquil
+    volumes:
+      - jitsi_prosody_data:/config
+      - jitsi_prosody_plugins:/prosody-plugins-custom
+    networks:
+      proyecto-network:
+        aliases:
+          - xmpp.meet.jitsi
+          - meet.jitsi
+          - auth.meet.jitsi
+    restart: unless-stopped
+
+  jicofo:
+    image: jitsi/jicofo:stable
+    container_name: jitsi-jicofo
+    environment:
+      XMPP_DOMAIN: meet.jitsi
+      XMPP_AUTH_DOMAIN: auth.meet.jitsi
+      XMPP_INTERNAL_MUC_DOMAIN: internal.auth.meet.jitsi
+      XMPP_SERVER: xmpp.meet.jitsi
+      JICOFO_COMPONENT_SECRET: ${JICOFO_COMPONENT_SECRET:?ERROR - define JICOFO_COMPONENT_SECRET en .env}
+      JICOFO_AUTH_PASSWORD: ${JICOFO_AUTH_PASSWORD:?ERROR - define JICOFO_AUTH_PASSWORD en .env}
+      JICOFO_AUTH_USER: focus
+      TZ: America/Guayaquil
+    volumes:
+      - jitsi_jicofo_data:/config
+    depends_on:
+      - prosody
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
+  jvb:
+    image: jitsi/jvb:stable
+    container_name: jitsi-jvb
+    environment:
+      XMPP_AUTH_DOMAIN: auth.meet.jitsi
+      XMPP_INTERNAL_MUC_DOMAIN: internal.auth.meet.jitsi
+      XMPP_SERVER: xmpp.meet.jitsi
+      JVB_AUTH_USER: jvb
+      JVB_AUTH_PASSWORD: ${JVB_AUTH_PASSWORD:?ERROR - define JVB_AUTH_PASSWORD en .env}
+      DOCKER_HOST_ADDRESS: ${JVB_ADVERTISE_IPS:-127.0.0.1}
+      TZ: America/Guayaquil
+    volumes:
+      - jitsi_jvb_data:/config
+    ports:
+      - "10000:10000/udp"
+    depends_on:
+      - prosody
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
+  jitsi-web:
+    image: jitsi/web:stable
+    container_name: jitsi-web
+    environment:
+      PUBLIC_URL: ${JITSI_PUBLIC_URL:-http://localhost:8443}
+      XMPP_DOMAIN: meet.jitsi
+      XMPP_AUTH_DOMAIN: auth.meet.jitsi
+      XMPP_MUC_DOMAIN: muc.meet.jitsi
+      XMPP_GUEST_DOMAIN: guest.meet.jitsi
+      XMPP_BOSH_URL_BASE: http://xmpp.meet.jitsi:5280
+      ENABLE_AUTH: 1
+      ENABLE_GUESTS: 1
+      TZ: America/Guayaquil
+    volumes:
+      - jitsi_web_data:/config
+    ports:
+      - "127.0.0.1:8443:80"
+    depends_on:
+      - prosody
+      - jicofo
+      - jvb
+    networks:
+      - proyecto-network
+    restart: unless-stopped
+
+  # ================================================================
+  # SPRINT 5 — SonarQube Community (análisis estático de código)
+  # UI: http://localhost:9000  admin/admin (cambiar en primer login)
+  # ================================================================
+
+  sonarqube:
+    image: sonarqube:10.4-community
+    container_name: proyecto-sonarqube
+    profiles: [tools]
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/sonarqube
+      SONAR_JDBC_USERNAME: ${POSTGRES_USER:-triage_admin}
+      SONAR_JDBC_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - define POSTGRES_PASSWORD en .env}
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    ports:
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - proyecto-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  # ================================================================
+  # SPRINT 4 — HashiCorp Vault (secrets + Transit Engine)
+  # UI: http://localhost:8200
+  # ================================================================
+
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: proyecto-vault
+    command: vault server -config=/vault/config/vault.hcl
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "127.0.0.1:8200:8200"
+    volumes:
+      - vault_data:/vault/data
+      - ./scripts/vault/vault.hcl:/vault/config/vault.hcl:ro
+    networks:
+      - proyecto-network
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://localhost:8200 || test $? -eq 2"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  vault-init:
+    image: hashicorp/vault:1.15
+    container_name: proyecto-vault-init
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER no definido}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD no definido}
+      MONGO_USER: ${MONGO_USER:?MONGO_USER no definido}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?MONGO_PASSWORD no definido}
+      RABBITMQ_USER: ${RABBITMQ_USER:?RABBITMQ_USER no definido}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD no definido}
+      TRIAGE_JWT_SECRET: ${TRIAGE_JWT_SECRET:?TRIAGE_JWT_SECRET no definido}
+      MONETIX_JWT_SECRET: ${MONETIX_JWT_SECRET:?MONETIX_JWT_SECRET no definido}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:?KEYCLOAK_ISSUER no definido}
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI:?KEYCLOAK_JWKS_URI no definido}
+    volumes:
+      - ./scripts/vault/init-vault.sh:/init-vault.sh:ro
+      - vault_data:/vault/data
+    entrypoint: ["sh", "/init-vault.sh"]
+    depends_on:
+      vault:
+        condition: service_healthy
+    networks:
+      - proyecto-network
+    restart: "no"
 
   # ================================================================
   # HERRAMIENTAS DE ADMINISTRACIÓN
@@ -443,8 +687,9 @@ services:
   adminer:
     image: adminer:4.8.1
     container_name: proyecto-adminer
+    profiles: [tools]
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       ADMINER_DEFAULT_SERVER: postgres
     networks:
@@ -454,14 +699,15 @@ services:
   mongo-express:
     image: mongo-express:1.0.0-alpha
     container_name: proyecto-mongo-express
+    profiles: [tools]
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER:-mongo_admin}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD:-mongo_secret_2024}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:-mongo_secret_2024}@mongodb:27017/
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD:?ERROR - define MONGO_PASSWORD en .env}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-mongo_admin}:${MONGO_PASSWORD:?ERROR - define MONGO_PASSWORD en .env}@mongodb:27017/
       ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASS:-admin123}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASS:?ERROR - define MONGO_EXPRESS_PASS en .env}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -480,3 +726,12 @@ volumes:
   rabbitmq_data:
   prescriptions_data:
   keycloak_db_data:
+  jitsi_prosody_data:
+  jitsi_prosody_plugins:
+  jitsi_jicofo_data:
+  jitsi_jvb_data:
+  jitsi_web_data:
+  vault_data:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:

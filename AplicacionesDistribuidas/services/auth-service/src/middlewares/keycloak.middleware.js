@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 
 const KEYCLOAK_ISSUER = process.env.KEYCLOAK_ISSUER;
 const KEYCLOAK_JWKS_URI = process.env.KEYCLOAK_JWKS_URI;
+const KEYCLOAK_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID;
 
 // Lazy-initialized JWKS client (solo si Keycloak está configurado)
 let jwksClient = null;
@@ -33,7 +34,7 @@ function verifyKeycloakToken(token) {
 
         // Decodificar header para obtener el kid antes de verificar firma
         const decoded = jwt.decode(token, { complete: true });
-        if (!decoded || !decoded.header || !decoded.header.kid) {
+        if (!decoded?.header?.kid) {
             return reject(new Error('Token sin kid en header'));
         }
 
@@ -47,7 +48,11 @@ function verifyKeycloakToken(token) {
             jwt.verify(
                 token,
                 signingKey,
-                { algorithms: ['RS256'], issuer: KEYCLOAK_ISSUER },
+                {
+                    algorithms: ['RS256'],
+                    issuer: KEYCLOAK_ISSUER,
+                    ...(KEYCLOAK_CLIENT_ID ? { audience: KEYCLOAK_CLIENT_ID } : {}),
+                },
                 (verifyErr, payload) => {
                     if (verifyErr) return reject(verifyErr);
                     resolve(payload);
@@ -65,7 +70,7 @@ function isKeycloakToken(token) {
     if (!KEYCLOAK_ISSUER) return false;
     try {
         const decoded = jwt.decode(token);
-        return decoded && decoded.iss && decoded.iss === KEYCLOAK_ISSUER;
+        return decoded?.iss === KEYCLOAK_ISSUER;
     } catch {
         return false;
     }
@@ -80,9 +85,8 @@ function mapKeycloakPayload(payload) {
 
     // Mapea roles de Keycloak a los roles del sistema Triage
     let role = 'PATIENT';
-    if (roles.includes('admin'))   role = 'ADMIN';
-    else if (roles.includes('doctor')) role = 'DOCTOR';
-    else if (roles.includes('patient')) role = 'PATIENT';
+    if (roles.includes('admin'))        role = 'ADMIN';
+    else if (roles.includes('doctor'))  role = 'DOCTOR';
 
     return {
         id: payload.sub,           // sub = Keycloak user UUID

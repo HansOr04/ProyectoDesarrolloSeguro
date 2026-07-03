@@ -1,0 +1,88 @@
+# ============================================================
+# Render Blueprint — Monetix (Sistema B)
+# NOTA: Triage (Sistema A) requiere RabbitMQ + Keycloak + 7 microservicios;
+#       se recomienda VPS para Triage (ver docker-compose.prod.yml).
+#
+# Pre-requisitos para Render:
+#  1. MongoDB Atlas: crear cluster gratis, obtener connection string
+#  2. Keycloak: desplegar en VPS o usar un servicio gestionado
+#  3. Render → New Blueprint → apuntar a este repositorio
+# ============================================================
+
+services:
+  # ── MONETIX BACKEND ──────────────────────────────────────────────
+  - type: web
+    name: monetix-backend
+    env: docker
+    dockerfilePath: ./MonetixBackend/Dockerfile
+    dockerContext: ./MonetixBackend
+    plan: free
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # Configurar en Render Dashboard → Environment → Secret Files
+      - key: MONGO_URI
+        sync: false   # Pegar URL de MongoDB Atlas en el dashboard de Render
+      - key: MONETIX_JWT_SECRET
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # CORS: completar con la URL real del frontend (se asigna tras el primer deploy)
+      - key: CORS_ORIGIN
+        sync: false
+      # Keycloak: apuntar a tu instancia VPS o servicio gestionado
+      - key: KEYCLOAK_ISSUER
+        sync: false
+      - key: KEYCLOAK_JWKS_URI
+        sync: false
+      - key: KEYCLOAK_CLIENT_ID
+        value: monetix-client
+      # Seguridad inter-servicio
+      - key: INTERNAL_API_SECRET
+        generateValue: true
+      - key: INTERNAL_SERVICE_SECRET
+        generateValue: true
+      - key: AUTH_RATE_LIMIT_MAX
+        value: "5"
+
+  # ── MONETIX FRONTEND ─────────────────────────────────────────────
+  - type: web
+    name: monetix-frontend
+    env: static
+    buildCommand: cd MonetixFrontend && npm install -g pnpm && pnpm install && pnpm run build
+    staticPublishPath: ./MonetixFrontend/dist
+    autoDeploy: true
+    # SPA routing: redirige todas las rutas a index.html
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      # Completar tras el primer deploy de monetix-backend (obtendrás la URL .onrender.com)
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_KEYCLOAK_URL
+        sync: false
+      - key: VITE_KEYCLOAK_REALM
+        value: universidad
+      - key: VITE_KEYCLOAK_CLIENT_ID
+        value: monetix-frontend

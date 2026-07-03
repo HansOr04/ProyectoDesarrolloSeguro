@@ -1,12 +1,18 @@
 /**
  * Jitsi Meet Integration Service
- * Creates and manages video conference rooms for teleconsultations
+ * Soporta Jitsi local (http://) y público (https://)
  */
 
 const JITSI_DOMAIN = process.env.JITSI_DOMAIN || 'meet.jit.si';
 
+// URL base completa: si JITSI_BASE_URL está definida se usa tal cual,
+// si no se construye con https para dominios externos y http para localhost
+const _isLocal = JITSI_DOMAIN.startsWith('localhost') || JITSI_DOMAIN.startsWith('127.');
+const JITSI_BASE_URL = process.env.JITSI_BASE_URL
+    || (_isLocal ? `http://${JITSI_DOMAIN}` : `https://${JITSI_DOMAIN}`);
+
 /**
- * Generate a unique room name for a teleconsult
+ * Genera un nombre de sala único para una teleconsulta
  */
 function generateRoomName(appointmentId) {
     const timestamp = Date.now();
@@ -15,13 +21,12 @@ function generateRoomName(appointmentId) {
 }
 
 /**
- * Create a video room for an appointment
+ * Crea una sala de video para una cita
  */
 async function createVideoRoom(appointmentId, patientName, doctorName) {
     const roomName = generateRoomName(appointmentId);
-    const meetingUrl = `https://${JITSI_DOMAIN}/${roomName}`;
+    const meetingUrl = `${JITSI_BASE_URL}/${roomName}`;
 
-    // Room configuration for Jitsi
     const roomConfig = {
         roomName,
         subject: `Teleconsulta: ${patientName}`,
@@ -38,18 +43,9 @@ async function createVideoRoom(appointmentId, patientName, doctorName) {
             defaultLanguage: 'es',
             enableLobbyChat: true,
             toolbarButtons: [
-                'microphone',
-                'camera',
-                'desktop',
-                'fullscreen',
-                'fodeviceselection',
-                'hangup',
-                'chat',
-                'settings',
-                'raisehand',
-                'videoquality',
-                'filmstrip',
-                'tileview'
+                'microphone', 'camera', 'desktop', 'fullscreen',
+                'fodeviceselection', 'hangup', 'chat', 'settings',
+                'raisehand', 'videoquality', 'filmstrip', 'tileview'
             ]
         },
         interfaceConfig: {
@@ -62,26 +58,16 @@ async function createVideoRoom(appointmentId, patientName, doctorName) {
             ENABLE_FEEDBACK_ANIMATION: false
         },
         participants: {
-            doctor: {
-                name: doctorName,
-                role: 'moderator'
-            },
-            patient: {
-                name: patientName,
-                role: 'participant'
-            }
+            doctor:  { name: doctorName,  role: 'moderator' },
+            patient: { name: patientName, role: 'participant' }
         }
     };
 
-    return {
-        meeting_url: meetingUrl,
-        room_name: roomName,
-        room_config: roomConfig
-    };
+    return { meeting_url: meetingUrl, room_name: roomName, room_config: roomConfig };
 }
 
 /**
- * Generate Jitsi embed configuration for frontend
+ * Configuración de embedding de Jitsi para el frontend
  */
 function getEmbedConfig(roomName, userName, isModerator = false) {
     return {
@@ -96,28 +82,21 @@ function getEmbedConfig(roomName, userName, isModerator = false) {
             SHOW_JITSI_WATERMARK: false,
             TOOLBAR_ALWAYS_VISIBLE: true
         },
-        userInfo: {
-            displayName: userName,
-            moderator: isModerator
-        }
+        userInfo: { displayName: userName, moderator: isModerator }
     };
 }
 
 /**
- * Generate join URL with parameters
+ * URL de acceso directo a la sala
  */
 function getJoinUrl(roomName, displayName, isModerator = false) {
-    const baseUrl = `https://${JITSI_DOMAIN}/${roomName}`;
-    const config = [];
-
-    config.push(`userInfo.displayName="${encodeURIComponent(displayName)}"`);
-    config.push('config.prejoinPageEnabled=true');
-    config.push('config.disableDeepLinking=true');
-
-    if (isModerator) {
-        config.push('config.startAsHost=true');
-    }
-
+    const baseUrl = `${JITSI_BASE_URL}/${roomName}`;
+    const config = [
+        `userInfo.displayName="${encodeURIComponent(displayName)}"`,
+        'config.prejoinPageEnabled=true',
+        'config.disableDeepLinking=true'
+    ];
+    if (isModerator) config.push('config.startAsHost=true');
     return `${baseUrl}#${config.join('&')}`;
 }
 
@@ -126,5 +105,6 @@ module.exports = {
     getEmbedConfig,
     getJoinUrl,
     generateRoomName,
-    JITSI_DOMAIN
+    JITSI_DOMAIN,
+    JITSI_BASE_URL
 };

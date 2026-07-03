@@ -33,9 +33,6 @@ function App() {
                     const kcUser = keycloakService.getUser()
                     if (kcUser) {
                         setUser(kcUser)
-                        // Sincronizar el token Keycloak para que los interceptores Axios lo usen
-                        localStorage.setItem('accessToken', keycloakService.getToken())
-                        localStorage.setItem('user', JSON.stringify(kcUser))
                         setLoading(false)
                         return
                     }
@@ -62,7 +59,6 @@ function App() {
         if (response.success) {
             setUser(response.data.user)
             localStorage.setItem('accessToken', response.data.accessToken)
-            localStorage.setItem('refreshToken', response.data.refreshToken)
             localStorage.setItem('user', JSON.stringify(response.data.user))
         }
         return response
