@@ -27,60 +27,55 @@ function getJwksClient() {
     return jwksClient;
 }
 
+function resolveRole(roles) {
+    if (roles.includes('admin'))  return 'ADMIN';
+    if (roles.includes('doctor')) return 'DOCTOR';
+    return 'PATIENT';
+}
+
+function getSigningKey(client, kid) {
+    return new Promise((resolve, reject) => {
+        client.getSigningKey(kid, (err, k) => {
+            if (err) reject(err);
+            else resolve(k);
+        });
+    });
+}
+
+function verifyJwt(token, publicKey) {
+    return new Promise((resolve, reject) => {
+        jwt.verify(token, publicKey, { algorithms: ['RS256'], issuer: KEYCLOAK_ISSUER, audience: KEYCLOAK_CLIENT_ID },
+            (err, p) => { if (err) reject(err); else resolve(p); }
+        );
+    });
+}
+
 async function authenticate(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
         return res.status(401).json({ success: false, message: 'Token requerido' });
     }
 
-    const token = authHeader.split(' ')[1];
     const client = getJwksClient();
-
     if (!client) {
         return res.status(503).json({ success: false, message: 'Servicio de autenticación no disponible (KEYCLOAK_JWKS_URI faltante)' });
     }
 
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.decode(token, { complete: true });
+    if (!decoded?.header?.kid) {
+        return res.status(401).json({ success: false, message: 'Token inválido' });
+    }
+
     try {
-        const decoded = jwt.decode(token, { complete: true });
-        if (!decoded?.header?.kid) {
-            return res.status(401).json({ success: false, message: 'Token inválido' });
-        }
-
-        const key = await new Promise((resolve, reject) => {
-            client.getSigningKey(decoded.header.kid, (err, k) => {
-                if (err) reject(err);
-                else resolve(k);
-            });
-        });
-
-        const payload = await new Promise((resolve, reject) => {
-            jwt.verify(
-                token,
-                key.getPublicKey(),
-                {
-                    algorithms: ['RS256'],
-                    issuer: KEYCLOAK_ISSUER,
-                    audience: KEYCLOAK_CLIENT_ID,
-                },
-                (err, p) => {
-                    if (err) reject(err);
-                    else resolve(p);
-                }
-            );
-        });
-
-        const roles = payload.roles || [];
-        let role = 'PATIENT';
-        if (roles.includes('admin'))       role = 'ADMIN';
-        else if (roles.includes('doctor')) role = 'DOCTOR';
-
+        const key = await getSigningKey(client, decoded.header.kid);
+        const payload = await verifyJwt(token, key.getPublicKey());
         req.user = {
             id: payload.sub,
             email: payload.email || '',
-            role,
+            role: resolveRole(payload.roles || []),
             isKeycloakUser: true,
         };
-
         next();
     } catch {
         return res.status(401).json({ success: false, message: 'Token inválido o expirado' });

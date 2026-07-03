@@ -107,38 +107,71 @@ const QUESTIONS = [
     }
 ];
 
+// Tabla de reglas de síntomas: cada regla detecta un síntoma a partir del
+// id de pregunta y el valor de respuesta, sin if/else anidados.
+const SYMPTOM_RULES = [
+    { questionId: 1, detect: (v) => v !== 'No',                      symptom: 'Dificultad respiratoria' },
+    { questionId: 2, detect: (v) => parseInt(v) > 0,                 symptom: 'Dolor en el pecho' },
+    { questionId: 3, detect: (v) => v === 'Sí',                      symptom: 'Pérdida de conciencia reciente' },
+    {
+        questionId: 4,
+        detect: (v) => {
+            const temp = typeof v === 'object' ? v?.temperature : null;
+            return temp && parseFloat(temp) >= 38 ? `Fiebre (${temp}°C)` : null;
+        },
+        symptom: null, // señal dinámica: detect() devuelve el string o null
+    },
+];
+
 /**
  * Calculate score for a single question
  */
 function calculateQuestionScore(question, answerValue) {
     switch (question.type) {
         case 'single_choice':
-            return question.weight[answerValue] || 0;
-
-        case 'scale':
-            const scaleValue = parseInt(answerValue);
-            return isNaN(scaleValue) ? 0 : scaleValue * question.weight_multiplier;
-
         case 'boolean':
             return question.weight[answerValue] || 0;
 
-        case 'conditional':
-            if (typeof question.weight === 'function') {
-                return question.weight(answerValue);
-            }
-            // For simple conditional like medication
-            if (typeof answerValue === 'object') {
-                return question.weight[answerValue.confirmed ? 'Sí' : 'No'] || 0;
-            }
-            return question.weight[answerValue] || 0;
-
-        case 'multiple_choice':
+        case 'scale': {
+            const scaleValue = parseInt(answerValue);
+            return isNaN(scaleValue) ? 0 : scaleValue * question.weight_multiplier;
+        }
+        case 'conditional': {
+            if (typeof question.weight === 'function') return question.weight(answerValue);
+            const key = typeof answerValue === 'object' ? (answerValue.confirmed ? 'Sí' : 'No') : answerValue;
+            return question.weight[key] || 0;
+        }
+        case 'multiple_choice': {
             const answers = Array.isArray(answerValue) ? answerValue : [answerValue];
             return answers.reduce((sum, ans) => sum + (question.weight[ans] || 0), 0);
-
+        }
         default:
             return 0;
     }
+}
+
+function collectCriticalFlags(question, answerValue) {
+    const flags = [];
+    if (question.critical_value && answerValue === question.critical_value) {
+        flags.push(question.critical_flag);
+    }
+    if (question.type === 'scale' && question.critical_threshold) {
+        const value = parseInt(answerValue);
+        if (!isNaN(value) && value >= question.critical_threshold) flags.push(question.critical_flag);
+    }
+    if (question.critical_check) {
+        const flag = question.critical_check(answerValue);
+        if (flag) flags.push(flag);
+    }
+    return flags;
+}
+
+function collectSymptom(question, answerValue) {
+    const rule = SYMPTOM_RULES.find(r => r.questionId === question.id);
+    if (!rule) return null;
+    const result = rule.detect(answerValue);
+    if (!result) return null;
+    return rule.symptom || (typeof result === 'string' ? result : null);
 }
 
 /**
@@ -151,44 +184,9 @@ function detectCriticalFlags(responses) {
     responses.forEach(response => {
         const question = QUESTIONS.find(q => q.id === response.question_id);
         if (!question) return;
-
-        // Check for direct critical values
-        if (question.critical_value && response.answer_value === question.critical_value) {
-            criticalFlags.push(question.critical_flag);
-        }
-
-        // Check for scale critical thresholds
-        if (question.type === 'scale' && question.critical_threshold) {
-            const value = parseInt(response.answer_value);
-            if (!isNaN(value) && value >= question.critical_threshold) {
-                criticalFlags.push(question.critical_flag);
-            }
-        }
-
-        // Check for conditional critical checks
-        if (question.critical_check) {
-            const flag = question.critical_check(response.answer_value);
-            if (flag) criticalFlags.push(flag);
-        }
-
-        // Collect symptoms for reporting
-        if (question.id === 1 && response.answer_value !== 'No') {
-            symptoms.push('Dificultad respiratoria');
-        }
-        if (question.id === 2 && parseInt(response.answer_value) > 0) {
-            symptoms.push('Dolor en el pecho');
-        }
-        if (question.id === 3 && response.answer_value === 'Sí') {
-            symptoms.push('Pérdida de conciencia reciente');
-        }
-        if (question.id === 4) {
-            const temp = typeof response.answer_value === 'object'
-                ? response.answer_value.temperature
-                : null;
-            if (temp && parseFloat(temp) >= 38) {
-                symptoms.push(`Fiebre (${temp}°C)`);
-            }
-        }
+        collectCriticalFlags(question, response.answer_value).forEach(f => criticalFlags.push(f));
+        const symptom = collectSymptom(question, response.answer_value);
+        if (symptom) symptoms.push(symptom);
     });
 
     return { criticalFlags, symptoms };

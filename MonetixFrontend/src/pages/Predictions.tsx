@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Prediction } from '@/types/finance.types';
 import predictionsService from '@/services/predictions.service';
+import { buildPredictionChartData } from '@/utils/predictionsHelpers';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Loader from '@/components/common/Loader';
@@ -327,72 +328,7 @@ const Predictions: React.FC = () => {
             </div>
           </Card>
         ) : (() => {
-          // Separate predictions by type
-          const incomePredictions = predictions.filter((p: Prediction) => p.type === 'income');
-          const expensePredictions = predictions.filter((p: Prediction) => p.type === 'expense');
-
-          // FALLBACK: If no predictions have type field, try to use all predictions
-          let latestIncome = incomePredictions.length > 0 ? incomePredictions[0] : null;
-          let latestExpense = expensePredictions.length > 0 ? expensePredictions[0] : null;
-
-          // If type field is missing, assume first prediction is income, second is expense
-          if (!latestIncome && !latestExpense && predictions.length > 0) {
-            latestIncome = predictions[0];
-            latestExpense = predictions.length > 1 ? predictions[1] : null;
-          }
-
-          // Combine data from both predictions
-          const incomeData = latestIncome?.predictions || [];
-          const expenseData = latestExpense?.predictions || [];
-
-          // Create a map by date
-          const dataMap = new Map();
-
-          incomeData.forEach((point: any) => {
-            const dateStr = new Date(point.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
-            dataMap.set(point.date, {
-              fecha: dateStr,
-              ingresos: point.amount || 0,
-              ingresosMin: point.lowerBound || 0,
-              ingresosMax: point.upperBound || point.amount || 0
-            });
-          });
-
-          expenseData.forEach((point: any) => {
-            const dateStr = new Date(point.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
-            const existing = dataMap.get(point.date) || { fecha: dateStr };
-            dataMap.set(point.date, {
-              ...existing,
-              gastos: point.amount || 0,
-              gastosMin: point.lowerBound || 0,
-              gastosMax: point.upperBound || point.amount || 0
-            });
-          });
-
-          // Convert map to array and sort by date
-          const combinedData = Array.from(dataMap.entries())
-            .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-            .map(([_, value]) => {
-              const ingresos = value.ingresos || 0;
-              const gastos = value.gastos || 0;
-              return {
-                ...value,
-                ideal: ingresos - gastos // Balance ideal
-              };
-            });
-
-          // Get model info from predictions
-          const modelType = latestIncome?.modelType || latestExpense?.modelType || 'linear_regression';
-          const confidence = latestIncome?.confidence || latestExpense?.confidence;
-          const createdAt = latestIncome?.createdAt || latestExpense?.createdAt;
-
-          // Format model name
-          const modelNames: Record<string, string> = {
-            'linear_regression': 'Regresión Lineal',
-            'moving_average': 'Media Móvil',
-            'exponential_smoothing': 'Suavizado Exponencial'
-          };
-          const modelName = modelNames[modelType] || modelType;
+          const { combinedData, modelName, confidence, createdAt } = buildPredictionChartData(predictions);
 
           return (
             <Card style={{ overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }}>
