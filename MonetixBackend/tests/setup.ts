@@ -19,10 +19,10 @@ beforeAll(async () => {
     const mongoUri = process.env.MONGO_URI_TEST || process.env.MONGO_URI || 'mongodb://localhost:27017/monetix-test';
 
     try {
-        await mongoose.connect(mongoUri);
+        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 3000 });
         console.log('Connected to test database');
     } catch (error) {
-        console.error('Error connecting to test database:', error);
+        console.warn('MongoDB not available for tests (unit tests still run):', (error as Error).message);
     }
 });
 

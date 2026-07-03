@@ -59,7 +59,7 @@ export class GoalController {
       const { id } = request.params;
       const userId = request.user?.id;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de meta inválido',
@@ -126,7 +126,7 @@ export class GoalController {
       const userId = request.user?.id;
       const updateData = request.body;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de meta inválido',
@@ -165,7 +165,7 @@ export class GoalController {
       const { id } = request.params;
       const userId = request.user?.id;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de meta inválido',
@@ -205,7 +205,7 @@ export class GoalController {
       const userId = request.user?.id;
       const { currentAmount } = request.body;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de meta inválido',
@@ -244,7 +244,7 @@ export class GoalController {
       const { id } = request.params;
       const userId = request.user?.id;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de meta inválido',

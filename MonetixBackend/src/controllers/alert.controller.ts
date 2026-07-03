@@ -38,7 +38,7 @@ export class AlertController {
       const { id } = request.params;
       const userId = request.user?.id;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de alerta inválido',
@@ -68,7 +68,7 @@ export class AlertController {
       const { id } = request.params;
       const userId = request.user?.id;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de alerta inválido',
@@ -121,7 +121,7 @@ export class AlertController {
       const { id } = request.params;
       const userId = request.user?.id;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de alerta inválido',

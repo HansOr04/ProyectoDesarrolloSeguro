@@ -113,7 +113,7 @@ export class ComparisonController {
                 });
             }
 
-            const comparison = await comparisonService.compareRealVsPredicted(userId!, predictionId);
+            const comparison = await comparisonService.compareRealVsPredicted(userId!, predictionId as string);
 
             return response.status(200).json({
                 success: true,

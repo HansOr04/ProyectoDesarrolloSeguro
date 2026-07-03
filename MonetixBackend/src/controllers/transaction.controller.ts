@@ -40,7 +40,7 @@ export class TransactionController {
       const { id } = request.params;
       const userId = request.user?.id!;
 
-      const transaction = await this.transactionService.getTransactionById(userId, id);
+      const transaction = await this.transactionService.getTransactionById(userId, id as string);
 
       if (!transaction) {
         return response.status(404).json({
@@ -87,7 +87,7 @@ export class TransactionController {
       const userId = request.user?.id!;
       const updateData = request.body;
 
-      const transaction = await this.transactionService.updateTransaction(userId, id, updateData);
+      const transaction = await this.transactionService.updateTransaction(userId, id as string, updateData);
 
       if (!transaction) {
         return response.status(404).json({
@@ -111,7 +111,7 @@ export class TransactionController {
       const { id } = request.params;
       const userId = request.user?.id!;
 
-      const deletedInfo = await this.transactionService.deleteTransaction(userId, id);
+      const deletedInfo = await this.transactionService.deleteTransaction(userId, id as string);
 
       return response.status(200).json({
         success: true,

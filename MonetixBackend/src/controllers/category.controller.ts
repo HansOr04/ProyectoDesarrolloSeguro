@@ -67,7 +67,7 @@ export class CategoryController {
       const userId = request.user?.id;
 
       // Validar ObjectId
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de categoría inválido',
@@ -184,7 +184,7 @@ export class CategoryController {
       const updateData = request.body;
 
       // Validar ObjectId
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de categoría inválido',
@@ -261,7 +261,7 @@ export class CategoryController {
       const userId = request.user?.id;
 
       // Validar ObjectId
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id as string)) {
         return response.status(400).json({
           success: false,
           message: 'ID de categoría inválido',
