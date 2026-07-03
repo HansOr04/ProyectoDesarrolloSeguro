@@ -1,7 +1,17 @@
 'use strict';
 /**
- * Sprint 4 — Cliente Vault para microservicios de Triage
- * Provee: lectura de secrets KV y cifrado/descifrado vía Transit Engine
+ * Sprint 4 — Cliente Vault para microservicios de Triage (Node.js/CommonJS)
+ * Provee: lectura de secrets KV y cifrado/descifrado vía Transit Engine.
+ *
+ * IMPLEMENTACIÓN PARALELA INTENCIONAL
+ * Este archivo y MonetixBackend/src/services/vault.service.ts implementan
+ * la misma lógica de autenticación AppRole y renovación de token de forma
+ * independiente. Monetix es un proyecto TypeScript sin acceso a este directorio
+ * shared/, por lo que no puede importar este módulo directamente.
+ *
+ * ⚠ Si modificas la lógica de autenticación AppRole, renovación de token o
+ *   manejo de errores en este archivo, DEBES replicar el cambio manualmente en
+ *   MonetixBackend/src/services/vault.service.ts y viceversa.
  */
 
 const VAULT_ADDR  = process.env.VAULT_ADDR  || 'http://vault:8200';

@@ -1,6 +1,16 @@
 /**
- * Sprint 4 — Cliente Vault para MonetixBackend
- * Provee: lectura de secrets KV y descifrado Transit para mensajes de Triage
+ * Sprint 4 — Cliente Vault para MonetixBackend (TypeScript)
+ * Provee: lectura de secrets KV y descifrado Transit para mensajes de Triage.
+ *
+ * IMPLEMENTACIÓN PARALELA INTENCIONAL
+ * Este archivo y AplicacionesDistribuidas/shared/utils/vault.js implementan
+ * la misma lógica de autenticación AppRole y renovación de token de forma
+ * independiente. MonetixBackend es un proyecto TypeScript autónomo sin acceso
+ * al directorio shared/ de Triage, por lo que no puede importar ese módulo.
+ *
+ * ⚠ Si modificas la lógica de autenticación AppRole, renovación de token o
+ *   manejo de errores en este archivo, DEBES replicar el cambio manualmente en
+ *   AplicacionesDistribuidas/shared/utils/vault.js y viceversa.
  */
 
 const VAULT_ADDR     = process.env.VAULT_ADDR     || 'http://vault:8200';
@@ -38,8 +48,8 @@ async function getToken(): Promise<string> {
     body: JSON.stringify({ role_id: VAULT_ROLE_ID, secret_id: VAULT_SECRET_ID }),
   });
   if (!res.ok) throw new Error(`Vault AppRole login failed: ${await res.text()}`);
-  const data = await res.json();
-  _token = data.auth.client_token as string;
+  const data = await res.json() as { auth: { client_token: string; lease_duration: number } };
+  _token = data.auth.client_token;
   const ttlMs = (data.auth.lease_duration - 60) * 1000;
   setTimeout(() => { _token = null; }, ttlMs > 0 ? ttlMs : 30_000);
   return _token;
