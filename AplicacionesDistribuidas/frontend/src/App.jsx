@@ -70,13 +70,12 @@ function App() {
     }
 
     const logout = () => {
-        const wasKeycloakUser = user?.isKeycloakUser
         setUser(null)
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')
         localStorage.removeItem('user')
 
-        if (wasKeycloakUser) {
+        if (keycloakService.isAuthenticated()) {
             keycloakService.logoutSSO()
         }
     }

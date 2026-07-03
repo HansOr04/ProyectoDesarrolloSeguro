@@ -74,10 +74,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = () => {
-    const wasKeycloakUser = !!(user as any)?.isKeycloakUser;
     authService.logout();
     setUser(null);
-    if (wasKeycloakUser) {
+    if (isKeycloakAuthenticated()) {
       logoutSSO();
     }
   };
